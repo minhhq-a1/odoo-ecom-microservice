@@ -8,6 +8,7 @@
 </div>
 
 <form method="POST" action="/admin/config/platforms" style="max-width:640px">
+  <input type="hidden" name="csrf_token" value="{{ request.cookies.get('csrf_token', '') }}">
   <div class="form-group">
     <label class="form-label">Platform</label>
     {% if is_new %}

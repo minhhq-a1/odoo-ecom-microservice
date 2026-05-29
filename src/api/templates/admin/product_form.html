@@ -8,6 +8,7 @@
 </div>
 
 <form method="POST" action="/admin/config/products" style="max-width:720px">
+  <input type="hidden" name="csrf_token" value="{{ request.cookies.get('csrf_token', '') }}">
   {% if not is_new %}<input type="hidden" name="mapping_id" value="{{ row.id }}">{% endif %}
 
   <div class="form-row">

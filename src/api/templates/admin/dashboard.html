@@ -41,6 +41,7 @@
         <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
             title="{{ o.last_error }}">{{ o.last_error or '—' }}</td>
         <td><form method="POST" action="/admin/orders/{{ o.id }}/retry">
+          <input type="hidden" name="csrf_token" value="{{ request.cookies.get('csrf_token', '') }}">
           <button class="btn btn-ghost btn-sm">🔄</button></form></td>
       </tr>
       {% endfor %}
