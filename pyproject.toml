@@ -89,4 +89,8 @@ show_missing = true
 
 [tool.bandit]
 exclude_dirs = ["tests", "migrations"]
-skips = ["B101"]
+# B101: assert in non-test code (not used outside tests anyway)
+# B411: xmlrpc.client — required to talk to Odoo (only XML-RPC endpoint
+#       exposed); endpoint is internal-trust, threat model excludes
+#       untrusted XML responses. Documented in 05_ODOO_INTEGRATION.md.
+skips = ["B101", "B411"]
