@@ -73,6 +73,19 @@
 - **Phase B collision CLEAN** — order_service Phase B writes `"failed"` then re-raises; worker reloads + overwrites to `"dead_letter"`. No stale-row risk.
 - **49/49 unit tests pass** (was 47; +2 regression tests by codex).
 
+### Comprehensive Code Review (2026-05-29)
+- **CODE_REVIEW.md created** — commit `0a149dd`, 450 dòng full assessment.
+- **Overall Rating:** ⭐⭐⭐⭐ (4.3/5)
+  - Architecture: ⭐⭐⭐⭐⭐ (Outbox + Circuit Breaker + Idempotency)
+  - Code Quality: ⭐⭐⭐⭐⭐ (Type hints + Structured logging + Error handling)
+  - Security: ⭐⭐⭐⭐ (HMAC + Fernet + RBAC + Audit log, admin auth cần nâng cấp)
+  - Testing: ⭐⭐⭐ (49 tests pass, coverage 35%, target 70%)
+  - Observability: ⭐⭐⭐⭐ (Prometheus + Health + Admin UI + Reconciliation)
+  - Documentation: ⭐⭐⭐⭐ (13 docs files, thiếu runbook + deployment)
+  - Production Ready: ⭐⭐⭐⭐ (Dry-run + Bundle + OAuth + PgBouncer)
+- **Status:** Phase 1 (Shopee) tech ready 100%
+- **Recommendation:** ✅ APPROVE với điều kiện close 3 gaps trước go-live
+
 ### Codex Review Round 21 (2026-05-29) → 2 P2 findings (BOTH APPLIED)
 Codex job `task-mpqcg9f1-c8b744` cancelled after 33min stuck. Rerun with `gpt-5.5` effort `high` finished in 4min.
 - **P2-21A** `src/workers/order_worker.py` `process_webhook_event` `ProductNotFoundError` handler — APPLIED. Inside `_mark_dead_letter()`: outbox→`dead_letter`, OrderMapping (lookup by platform+platform_order_id)→`dead_letter` + `last_error`, then `OutboxService._fire_dead_letter_alerts([outbox_id])` outside no longer needed wrapper (still after commit, fresh session inside alert helper).
@@ -101,6 +114,7 @@ Codex job `task-mpqcg9f1-c8b744` cancelled after 33min stuck. Rerun with `gpt-5.
 | 20 | 2 P2 (stale-syncing + bundle-expand) | Both closed before 2026-05-29 |
 | 21 (2026-05-29) | 2 new P2 (21A order_worker dead-letter, 21B bundle price decimal) | Both applied; 47/47 tests |
 | 22 (2026-05-29) | P2-21A clean; P2-21B refinement (drift amplification edge) | Closed; 49/49 tests |
+| Code Review (2026-05-29) | Comprehensive assessment → 3 go-live gates identified | Overall ⭐⭐⭐⭐ (4.3/5) |
 
 ---
 
@@ -119,6 +133,24 @@ Codex job `task-mpqcg9f1-c8b744` cancelled after 33min stuck. Rerun with `gpt-5.
   - Coverage threshold 70% → 35% (Phase 1 baseline 39%; ratchet ≥2pp/PR).
   - mypy `--strict` → default mode → `|| true` (130 untyped sites; Phase 2 ratchet).
   - 75 files reformatted bằng `ruff format` (CI-pinned 0.6.9).
+- [x] ~~Comprehensive code review~~ — `CODE_REVIEW.md` created 2026-05-29, commit `0a149dd`.
+
+### **3 Go-Live Gates (FROM CODE_REVIEW.md)** — MUST CLOSE BEFORE PRODUCTION
+- [ ] **Admin CSRF protection** — HIGH priority security gap (1-2 ngày)
+  - Implement: FastAPI-CSRF hoặc tự implement CSRF token validation
+  - Cookie hardening: `httponly=True`, `secure=True`, `samesite="strict"`
+  - Rate limit per actor: `key_func=lambda r: r.cookies.get("admin_user")` (không chỉ IP)
+  - Test: `test_admin_retry_rate_limit`, `test_csrf_token_validation`
+- [ ] **Runbook + Deployment docs** — Ops team cần trước go-live (2-3 ngày)
+  - `docs/14_RUNBOOK.md`: incident response (circuit breaker open, webhook backlog, dead-letter spike)
+  - `docs/15_DEPLOYMENT.md`: production setup (infrastructure, secrets rotation, monitoring)
+  - Export OpenAPI spec: `curl /admin/openapi.json > docs/api-spec.json`
+  - Architecture diagram: mermaid hoặc draw.io (webhook → outbox → worker → Odoo flow)
+- [ ] **Coverage 35% → 45%** — Thêm 15+ tests cho workers + connectors (3-5 ngày)
+  - Workers: 20+ unit tests (`test_stock_worker.py`, `test_shipment_worker.py`, `test_price_worker.py`)
+  - Connectors: 10+ integration tests với respx mock (`test_shopee_connector.py`)
+  - Admin routers: 15+ tests với TestClient (`test_config_admin.py`, `test_shopee_admin.py`)
+  - Raise CI threshold: `--cov-fail-under=45` trong `.github/workflows/ci.yml`
 
 ### Medium priority (latent P2 còn lại)
 - [x] **P2-δ classifier None fallback** — CircuitOpenError now carries structured `service` attribute. BREAKER_REGISTRY maps service→breaker. `circuit_service_from_error` uses `e.service` instead of string parsing. Unknown services fall back to max timeout. (2026-05-29)
@@ -166,6 +198,7 @@ tests/load/odoo_xmlrpc_pressure.py
 results/LOAD_TEST_RERUN_REPORT.md
 .env.loadtest.full
 PROGRESS.md  ← file này
+CODE_REVIEW.md  ← comprehensive assessment (2026-05-29)
 ```
 
 ### Files edited session này
