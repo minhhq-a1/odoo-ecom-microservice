@@ -110,8 +110,9 @@ Codex job `task-mpqcg9f1-c8b744` cancelled after 33min stuck. Rerun with `gpt-5.
 - [x] ~~Apply Round 21 P2-21A + P2-21B~~ — done 2026-05-29.
 - [x] ~~Unit tests cho bundle Decimal split + dead-letter flip~~ — `test_odoo_client_bundle_split.py` (5 tests), `test_order_worker_dead_letter.py` (2 tests).
 - [x] ~~Codex review round 22~~ — closed 2026-05-29; codex auto-applied P2-21B drift-amplification refinement; 49/49 pass.
-- [ ] **Push Odoo addon branch** `feat/a1_sale_ecom_middleware` commit `00133c4e5` lên remote + tạo MR.
-- [ ] **Commit middleware tree** — toàn bộ thư mục đang untracked, chưa từng commit kể từ `5b95f51 first commit`.
+- [x] ~~Push Odoo addon branch~~ — `feat/a1_sale_ecom_middleware` HEAD `00133c4e5` đã ở remote gitlab `dc7-tc-team/onnet-dc7-internal`. (PROGRESS.md trước đó nhầm.)
+- [x] ~~Commit middleware tree~~ — done 2026-05-29: commit `9fd594e` "feat: Phase 1 Shopee middleware (FastAPI + Celery + Outbox)", 170 files / 16738 insertions, pushed to `origin/main` (github `minhhq-a1/odoo-ecom-microservice`).
+- [ ] **Create MR for addon** `feat/a1_sale_ecom_middleware` → main on gitlab (nếu chưa có).
 
 ### Medium priority (latent P2 còn lại)
 - [ ] **P2-δ classifier None fallback** — `_circuit_service_from_error` returns None for future 3rd breaker → 65s wait. Add explicit registry of known services.
