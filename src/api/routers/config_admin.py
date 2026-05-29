@@ -9,7 +9,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import desc, select
 
-from src.api.dependencies import get_async_db, require_admin_token, set_admin_cookie
+from src.api.csrf_helper import set_csrf_cookie
+from src.api.dependencies import get_async_db, require_admin_token, set_admin_cookie, verify_csrf
 from src.connectors.shopee.oauth import auth_status as shopee_auth_status
 from src.connectors.shopee.oauth import build_auth_url, issue_oauth_state
 from src.core.config import settings
@@ -66,9 +67,12 @@ async def platforms_list(
             "request": request,
             "rows": rows,
             "flash": flash,
+            "csrf_token": "",
         },
     )
     set_admin_cookie(resp)
+    csrf_token = set_csrf_cookie(resp)
+    resp.context["csrf_token"] = csrf_token
     return resp
 
 
@@ -83,9 +87,12 @@ async def platforms_new_form(
             "request": request,
             "row": None,
             "is_new": True,
+            "csrf_token": "",
         },
     )
     set_admin_cookie(resp)
+    csrf_token = set_csrf_cookie(resp)
+    resp.context["csrf_token"] = csrf_token
     return resp
 
 
@@ -109,9 +116,12 @@ async def platforms_edit_form(
             "request": request,
             "row": row,
             "is_new": False,
+            "csrf_token": "",
         },
     )
     set_admin_cookie(resp)
+    csrf_token = set_csrf_cookie(resp)
+    resp.context["csrf_token"] = csrf_token
     return resp
 
 
@@ -119,7 +129,8 @@ async def platforms_edit_form(
 async def platforms_save(
     request: Request,
     db: AsyncSession = Depends(get_async_db),
-    _: str = Depends(require_admin_token),
+    _auth: str = Depends(require_admin_token),
+    _csrf: None = Depends(verify_csrf),
     platform: str = Form(...),
     shop_id: str = Form(default=""),
     is_active: str = Form(default=""),
@@ -165,7 +176,8 @@ async def platforms_delete(
     platform: str,
     request: Request,
     db: AsyncSession = Depends(get_async_db),
-    _: str = Depends(require_admin_token),
+    _auth: str = Depends(require_admin_token),
+    _csrf: None = Depends(verify_csrf),
 ) -> RedirectResponse:
     row = (
         await db.execute(
@@ -221,9 +233,12 @@ async def shopee_setup(
             "sandbox": settings.SHOPEE_IS_SANDBOX,
             "cfg": cfg,
             "flash": flash,
+            "csrf_token": "",
         },
     )
     set_admin_cookie(resp)
+    csrf_token = set_csrf_cookie(resp)
+    resp.context["csrf_token"] = csrf_token
     return resp
 
 
@@ -264,9 +279,12 @@ async def products_list(
             "search": search,
             "page": page,
             "flash": flash,
+            "csrf_token": "",
         },
     )
     set_admin_cookie(resp)
+    csrf_token = set_csrf_cookie(resp)
+    resp.context["csrf_token"] = csrf_token
     return resp
 
 
@@ -282,9 +300,12 @@ async def products_new_form(
             "row": None,
             "components": [],
             "is_new": True,
+            "csrf_token": "",
         },
     )
     set_admin_cookie(resp)
+    csrf_token = set_csrf_cookie(resp)
+    resp.context["csrf_token"] = csrf_token
     return resp
 
 
@@ -316,9 +337,12 @@ async def products_edit_form(
             "row": row,
             "components": comps,
             "is_new": False,
+            "csrf_token": "",
         },
     )
     set_admin_cookie(resp)
+    csrf_token = set_csrf_cookie(resp)
+    resp.context["csrf_token"] = csrf_token
     return resp
 
 
@@ -326,7 +350,8 @@ async def products_edit_form(
 async def products_save(
     request: Request,
     db: AsyncSession = Depends(get_async_db),
-    _: str = Depends(require_admin_token),
+    _auth: str = Depends(require_admin_token),
+    _csrf: None = Depends(verify_csrf),
     mapping_id: str = Form(default=""),
     platform: str = Form(...),
     platform_product_id: str = Form(...),
@@ -421,7 +446,8 @@ async def products_delete(
     mapping_id: int,
     request: Request,
     db: AsyncSession = Depends(get_async_db),
-    _: str = Depends(require_admin_token),
+    _auth: str = Depends(require_admin_token),
+    _csrf: None = Depends(verify_csrf),
 ) -> RedirectResponse:
     row = await db.get(ProductMapping, mapping_id)
     if row is None:
@@ -471,9 +497,12 @@ async def stock_list(
             "request": request,
             "rows": rows,
             "flash": flash,
+            "csrf_token": "",
         },
     )
     set_admin_cookie(resp)
+    csrf_token = set_csrf_cookie(resp)
+    resp.context["csrf_token"] = csrf_token
     return resp
 
 
@@ -481,7 +510,8 @@ async def stock_list(
 async def stock_save(
     request: Request,
     db: AsyncSession = Depends(get_async_db),
-    _: str = Depends(require_admin_token),
+    _auth: str = Depends(require_admin_token),
+    _csrf: None = Depends(verify_csrf),
     cfg_id: str = Form(default=""),
     odoo_sku: str = Form(...),
     platform: str = Form(...),
@@ -523,7 +553,8 @@ async def stock_delete(
     cfg_id: int,
     request: Request,
     db: AsyncSession = Depends(get_async_db),
-    _: str = Depends(require_admin_token),
+    _auth: str = Depends(require_admin_token),
+    _csrf: None = Depends(verify_csrf),
 ) -> RedirectResponse:
     row = await db.get(StockAllocationConfig, cfg_id)
     if row is None:

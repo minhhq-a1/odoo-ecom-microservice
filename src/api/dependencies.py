@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fastapi import Cookie, HTTPException, Query, status
+from fastapi import Cookie, Form, Header, HTTPException, Query, status
 
 from src.core.config import settings
+from src.core.csrf import verify_csrf_token
 from src.core.database import get_async_db as _get_async_db
 
 if TYPE_CHECKING:
@@ -52,3 +53,27 @@ def set_admin_cookie(resp: Response) -> None:
         samesite="lax",
         secure=settings.ENVIRONMENT != "development",
     )
+
+
+def verify_csrf(
+    csrf_token_cookie: str | None = Cookie(default=None, alias="csrf_token"),
+    csrf_token_form: str | None = Form(default=None, alias="csrf_token"),
+    x_csrf_token: str | None = Header(default=None),
+) -> None:
+    """Verify CSRF token using double submit cookie pattern.
+
+    Accepts token from:
+    1. Form field: csrf_token (POST form data)
+    2. Header: X-CSRF-Token (AJAX requests)
+
+    Compares against csrf_token cookie using constant-time comparison.
+
+    Raises:
+        HTTPException 403: If token missing or mismatch
+    """
+    form_token = csrf_token_form or x_csrf_token
+    if not verify_csrf_token(csrf_token_cookie, form_token):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="CSRF token missing or invalid",
+        )

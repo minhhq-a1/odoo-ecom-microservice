@@ -10,7 +10,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import desc, func, select
 
-from src.api.dependencies import get_async_db, require_admin_token, set_admin_cookie
+from src.api.csrf_helper import set_csrf_cookie
+from src.api.dependencies import get_async_db, require_admin_token, set_admin_cookie, verify_csrf
 from src.core.config import settings
 from src.core.logging import get_logger
 from src.models.audit_log import AuditLog
@@ -103,9 +104,13 @@ async def dashboard(
             "recent_failures": recent_failures,
             "now": datetime.now(UTC),
             "settings": settings,
+            "csrf_token": "",  # Will be set by set_csrf_cookie
         },
     )
     set_admin_cookie(resp)
+    csrf_token = set_csrf_cookie(resp)
+    # Update template context with actual token
+    resp.context["csrf_token"] = csrf_token
     return resp
 
 
@@ -114,7 +119,8 @@ async def retry_order(
     order_id: int,
     request: Request,
     db: AsyncSession = Depends(get_async_db),
-    _: str = Depends(require_admin_token),
+    _auth: str = Depends(require_admin_token),
+    _csrf: None = Depends(verify_csrf),
 ) -> RedirectResponse:
     mapping = await db.get(OrderMapping, order_id)
     if not mapping:
