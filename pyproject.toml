@@ -40,6 +40,7 @@ ignore = [
     "ERA001",   # commented-out code (intentional examples)
     "PT011",    # pytest.raises too broad — fine here
     "PLW2901",  # loop var reassignment
+    "ISC001",   # implicit string concat — conflicts with formatter
 ]
 
 [tool.ruff.lint.per-file-ignores]

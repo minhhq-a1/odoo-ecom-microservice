@@ -158,7 +158,7 @@ ecommerce-middleware/
 # ✅ Good
 class ShopeeConnector:
     MAX_RETRY = 5
-    
+
     async def get_order_detail(self, order_sn: str) -> dict:
         ...
 
@@ -264,22 +264,22 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL:   str
     REDIS_URL:      str = "redis://localhost:6379/0"
-    
+
     # Odoo
     ODOO_URL:       str
     ODOO_DB:        str
     ODOO_USER:      str
     ODOO_PASSWORD:  str
-    
+
     # Shopee
     SHOPEE_PARTNER_ID:   str
     SHOPEE_PARTNER_KEY:  str
     SHOPEE_SHOP_ID:      str
-    
+
     # App
     LOG_LEVEL:      str = "INFO"
     ENVIRONMENT:    str = "production"  # development/staging/production
-    
+
     class Config:
         env_file = ".env"
 
@@ -307,10 +307,10 @@ def test_shopee_transformer_maps_status_correctly():
 def test_duplicate_order_skipped(db_session, mock_odoo):
     # Tạo existing mapping
     db_session.add(OrderMapping(platform="shopee", platform_order_id="TEST123"))
-    
+
     # Chạy sync
     result = sync_order_to_odoo.apply(args=[sample_order])
-    
+
     # Phải skip
     assert result.result["status"] == "skipped"
     mock_odoo.create_sale_order.assert_not_called()

@@ -67,7 +67,9 @@ def _bootstrap(uid: int) -> tuple[int, int]:
             {"limit": 1},
         )
         if not partner_ids:
-            raise SystemExit("Partner bootstrap failed: create raised Fault but search found nothing")
+            raise SystemExit(
+                "Partner bootstrap failed: create raised Fault but search found nothing"
+            )
         partner_id = partner_ids[0]
 
     # Product: try create first, fall back to search on UNIQUE(default_code) violation
@@ -98,7 +100,9 @@ def _bootstrap(uid: int) -> tuple[int, int]:
             {"limit": 1},
         )
         if not product_ids:
-            raise SystemExit("Product bootstrap failed: create raised Fault but search found nothing")
+            raise SystemExit(
+                "Product bootstrap failed: create raised Fault but search found nothing"
+            )
         product_id = product_ids[0]
 
     return partner_id, product_id

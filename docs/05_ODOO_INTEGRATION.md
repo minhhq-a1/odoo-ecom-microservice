@@ -103,18 +103,18 @@ class OdooClient:
 
     def get_or_create_partner(self, address: UnifiedAddress) -> int:
         """Tìm partner theo phone, nếu không có thì tạo mới"""
-        
+
         # Tìm theo phone (normalize: bỏ +84, thêm 0)
         phone = self._normalize_phone(address.phone)
-        
-        existing = self._search_read("res.partner", 
+
+        existing = self._search_read("res.partner",
             domain=[["phone", "=", phone]],
             fields=["id"], limit=1
         )
-        
+
         if existing:
             return existing[0]["id"]
-        
+
         # Tạo mới
         return self._create("res.partner", {
             "name":    address.full_name,
@@ -130,11 +130,11 @@ class OdooClient:
 
     def create_sale_order(self, order: UnifiedOrder) -> tuple[int, str]:
         """Tạo sale order, trả về (id, name)"""
-        
+
         partner_id    = self.get_or_create_partner(order.shipping_address)
         order_lines   = self._build_order_lines(order.items)
         pricelist_id  = self._get_pricelist_vnd()
-        
+
         so_id = self._create("sale.order", {
             "partner_id":            partner_id,
             "partner_invoice_id":    partner_id,
@@ -148,13 +148,13 @@ class OdooClient:
             "note":                  self._build_order_note(order),
             "order_line":            order_lines,
         })
-        
+
         # Lấy tên SO (SO0001, SO0002...)
         so = self._read("sale.order", [so_id], ["name"])[0]
-        
+
         # Tự confirm order (state: draft → sale)
         self._execute("sale.order", "action_confirm", [[so_id]])
-        
+
         return so_id, so["name"]
 
     def _build_order_lines(self, items: List[UnifiedOrderItem]) -> list:
@@ -163,7 +163,7 @@ class OdooClient:
             product_id = self._get_product_id_by_sku(item.sku)
             if not product_id:
                 raise ProductNotFoundError(f"SKU not found in Odoo: {item.sku}")
-            
+
             lines.append((0, 0, {
                 "product_id":       product_id,
                 "name":             f"{item.product_name} - {item.variant_name or ''}".strip(" -"),
@@ -177,20 +177,20 @@ class OdooClient:
 
     def get_stock_quantity(self, sku: str, warehouse_id: int = None) -> int:
         """Lấy virtual_available (có tính incoming - outgoing)"""
-        
+
         domain = [["default_code", "=", sku]]
-        
+
         result = self._search_read("product.product", domain,
             ["qty_available", "virtual_available", "id"]
         )
-        
+
         if not result:
             return 0
-        
+
         # Nếu cần stock theo warehouse cụ thể → dùng stock.quant
         if warehouse_id:
             return self._get_warehouse_stock(result[0]["id"], warehouse_id)
-        
+
         return int(result[0]["virtual_available"])
 
     def _get_product_id_by_sku(self, sku: str) -> Optional[int]:

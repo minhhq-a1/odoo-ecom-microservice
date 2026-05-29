@@ -1,4 +1,5 @@
 """Block CI if migration contains unsafe DDL patterns."""
+
 from __future__ import annotations
 
 import pathlib
@@ -6,18 +7,21 @@ import re
 import sys
 
 UNSAFE = [
-    (re.compile(r"ADD COLUMN .* NOT NULL(?! DEFAULT)", re.IGNORECASE),
-     "Add NOT NULL column without DEFAULT — locks table on large tables"),
-    (re.compile(r"DROP COLUMN", re.IGNORECASE),
-     "DROP COLUMN — requires expand/contract release pattern"),
-    (re.compile(r"ALTER COLUMN .* TYPE", re.IGNORECASE),
-     "ALTER COLUMN TYPE — rewrites table"),
-    (re.compile(r"CREATE INDEX(?! CONCURRENTLY)", re.IGNORECASE),
-     "CREATE INDEX without CONCURRENTLY — blocks writes"),
-    (re.compile(r"DROP INDEX(?! CONCURRENTLY)", re.IGNORECASE),
-     "DROP INDEX without CONCURRENTLY"),
-    (re.compile(r"LOCK TABLE", re.IGNORECASE),
-     "Explicit LOCK TABLE"),
+    (
+        re.compile(r"ADD COLUMN .* NOT NULL(?! DEFAULT)", re.IGNORECASE),
+        "Add NOT NULL column without DEFAULT — locks table on large tables",
+    ),
+    (
+        re.compile(r"DROP COLUMN", re.IGNORECASE),
+        "DROP COLUMN — requires expand/contract release pattern",
+    ),
+    (re.compile(r"ALTER COLUMN .* TYPE", re.IGNORECASE), "ALTER COLUMN TYPE — rewrites table"),
+    (
+        re.compile(r"CREATE INDEX(?! CONCURRENTLY)", re.IGNORECASE),
+        "CREATE INDEX without CONCURRENTLY — blocks writes",
+    ),
+    (re.compile(r"DROP INDEX(?! CONCURRENTLY)", re.IGNORECASE), "DROP INDEX without CONCURRENTLY"),
+    (re.compile(r"LOCK TABLE", re.IGNORECASE), "Explicit LOCK TABLE"),
 ]
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent / "migrations" / "versions"

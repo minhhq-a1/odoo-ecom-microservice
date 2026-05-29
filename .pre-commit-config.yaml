@@ -1,0 +1,54 @@
+# Pre-commit hooks for Odoo E-Commerce Middleware
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+        types_or: [python, pyi]
+      - id: ruff-format
+        types_or: [python, pyi]
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        args: [--config-file=mypy.ini]
+        additional_dependencies:
+          - types-redis
+          - types-requests
+          - sqlalchemy[mypy]
+        # Phase 1: warning-only, don't block commits
+        # Phase 2: remove verbose flag once ~130 sites annotated
+        verbose: true
+        # Allow mypy to fail without blocking commit (exit 0)
+        # Remove this once Phase 2 mypy strict is complete
+        entry: bash -c 'mypy "$@" || true' --
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+        exclude: |
+          (?x)^(
+            tests/.*|
+            \.secrets\.baseline
+          )$
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--unsafe]  # Allow custom YAML tags
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: mixed-line-ending
+        args: [--fix=lf]

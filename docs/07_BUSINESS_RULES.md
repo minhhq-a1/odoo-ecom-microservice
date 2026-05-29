@@ -23,7 +23,7 @@ def is_duplicate(platform: str, platform_order_id: str) -> bool:
     ).first()
     if mapping:
         return True
-    
+
     # Double-check Odoo (phòng trường hợp DB middleware bị reset)
     return odoo.check_order_exists(platform, platform_order_id) is not None
 ```
@@ -112,20 +112,20 @@ def get_product_mapping(sku: str) -> Optional[int]:
     cached = redis.get(f"product:sku:{sku}")
     if cached:
         return int(cached)
-    
+
     # 2. Check mapping table
     mapping = db.query(ProductMapping).filter_by(odoo_sku=sku).first()
     if mapping:
         redis.setex(f"product:sku:{sku}", 3600, mapping.odoo_product_id)
         return mapping.odoo_product_id
-    
+
     # 3. Tìm trực tiếp trên Odoo
     odoo_id = odoo_client.get_product_by_sku(sku)
     if odoo_id:
         # Tự động tạo mapping
         create_product_mapping(sku=sku, odoo_product_id=odoo_id)
         return odoo_id
-    
+
     # 4. Không tìm thấy → alert
     alert_missing_sku(sku)
     return None
@@ -204,14 +204,14 @@ Lưu trữ:
 ```python
 def handle_order_cancellation(platform_order_id: str, platform: str):
     mapping = get_order_mapping(platform, platform_order_id)
-    
+
     if not mapping or mapping.status != "success":
         # Chưa sync sang Odoo → chỉ cập nhật mapping
         update_mapping_status(mapping, "cancelled")
         return
-    
+
     odoo_order = odoo.get_sale_order(mapping.odoo_order_id)
-    
+
     if odoo_order["state"] == "draft":
         odoo.cancel_order(mapping.odoo_order_id)
     elif odoo_order["state"] == "sale":

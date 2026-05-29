@@ -132,10 +132,10 @@ Codex job `task-mpqcg9f1-c8b744` cancelled after 33min stuck. Rerun with `gpt-5.
 - [x] **Node 24 actions** — upgraded docker actions: build-push-action v5→v7, login-action v3→v4, setup-buildx-action v3→v4. Core actions already v4/v5. (2026-05-29)
 
 ### Low priority (chaos drills, ops)
+- [x] **Pre-commit hooks** — `.pre-commit-config.yaml` (ruff + ruff-format + mypy + detect-secrets + trailing-whitespace + end-of-file-fixer + check-yaml + check-added-large-files + check-merge-conflict + mixed-line-ending). mypy.ini created. ISC001 added to ignore (formatter conflict). (2026-05-29)
 - [ ] **Load test scenario 3** (Odoo down 5min) — operator manual ENTER required.
 - [ ] **Load test scenario 4** (Redis restart) — operator manual ENTER required.
 - [ ] **Full E2E middleware-path load** — locust → webhooks → outbox → workers → real Odoo (with seeded product mappings). Pre-prod sign-off task.
-- [ ] **Pre-commit hooks** `.pre-commit-config.yaml` (ruff + mypy + detect-secrets).
 - [ ] **Bulk import product mapping CSV** scaffolding.
 - [ ] **Order list + Outbox detail pages** templates (routes có, templates thiếu).
 

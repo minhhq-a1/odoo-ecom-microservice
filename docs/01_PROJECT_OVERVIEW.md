@@ -60,7 +60,7 @@ Xây dựng middleware layer tự phát triển (không phụ thuộc vendor) đ
 ## Luồng dữ liệu chính
 
 ```
-[Shopee/Lazada/TikTok] 
+[Shopee/Lazada/TikTok]
     → Webhook / Polling
     → Connector Layer (auth, rate limit, retry)
     → Normalization Layer (unified schema)
@@ -71,7 +71,7 @@ Xây dựng middleware layer tự phát triển (không phụ thuộc vendor) đ
 ```
 
 ```
-[Odoo 18] 
+[Odoo 18]
     → Stock change event
     → Middleware stock sync service
     → Phân bổ tồn kho theo cấu hình

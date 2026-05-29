@@ -4,6 +4,7 @@ Usage:
   ./scripts/verify_load_test.py --scenario normal --prometheus http://prom:9090 \
        --db postgresql://... --since 600 --max-error-rate 0.001
 """
+
 from __future__ import annotations
 
 import argparse
@@ -34,7 +35,7 @@ def check_normal(prom: str, window: int, max_error_rate: float) -> int:
     fails = 0
     err = query_prom(
         prom,
-        f"sum(rate(mw_webhook_response_seconds_count{{status_code=~\"5..\"}}[{window}s]))"
+        f'sum(rate(mw_webhook_response_seconds_count{{status_code=~"5.."}}[{window}s]))'
         f" / sum(rate(mw_webhook_response_seconds_count[{window}s]))",
     )
     if err is not None and err > max_error_rate:
@@ -112,9 +113,9 @@ def check_recovery(prom: str, window: int) -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--scenario",
-                    choices=["normal", "flashsale", "odoo_down", "redis_restart"],
-                    required=True)
+    ap.add_argument(
+        "--scenario", choices=["normal", "flashsale", "odoo_down", "redis_restart"], required=True
+    )
     ap.add_argument("--prometheus", required=True)
     ap.add_argument("--since", type=int, default=600, help="window seconds")
     ap.add_argument("--max-error-rate", type=float, default=0.001)

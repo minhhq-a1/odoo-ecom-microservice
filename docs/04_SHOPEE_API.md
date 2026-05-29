@@ -310,7 +310,7 @@ async def polling_fallback():
         time_from=time_from,
         time_to=time_to
     )
-    
+
     for order in orders:
         # Gửi vào queue để xử lý (có idempotency check)
         await queue.push("orders.updated", order)
