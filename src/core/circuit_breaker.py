@@ -56,7 +56,7 @@ class CircuitBreaker:
         async with self._lock:
             await self._maybe_transition_to_half_open()
             if self._state is CBState.OPEN:
-                raise CircuitOpenError(f"Circuit {self.service} is OPEN")
+                raise CircuitOpenError(self.service, f"Circuit {self.service} is OPEN")
 
         try:
             result = await fn(*args, **kwargs)
@@ -119,3 +119,8 @@ shopee_breaker = CircuitBreaker(
     rolling_window_seconds=60,
     open_timeout_seconds=30,
 )
+
+BREAKER_REGISTRY: dict[str, CircuitBreaker] = {
+    "odoo": odoo_breaker,
+    "shopee": shopee_breaker,
+}

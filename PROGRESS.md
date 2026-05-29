@@ -121,7 +121,7 @@ Codex job `task-mpqcg9f1-c8b744` cancelled after 33min stuck. Rerun with `gpt-5.
   - 75 files reformatted bằng `ruff format` (CI-pinned 0.6.9).
 
 ### Medium priority (latent P2 còn lại)
-- [ ] **P2-δ classifier None fallback** — `_circuit_service_from_error` returns None for future 3rd breaker → 65s wait. Add explicit registry of known services.
+- [x] **P2-δ classifier None fallback** — CircuitOpenError now carries structured `service` attribute. BREAKER_REGISTRY maps service→breaker. `circuit_service_from_error` uses `e.service` instead of string parsing. Unknown services fall back to max timeout. (2026-05-29)
 - [ ] **P2-ε pressure-test bootstrap race** — `tests/load/odoo_xmlrpc_pressure.py` search-then-create on partner/product without lock. Use UNIQUE constraint + `ON CONFLICT` upsert path or `xmlrpc` `name_search`.
 - [ ] **P1-retry-counter** — `request.retries` shared across exception types in `order_worker`. Future biz rule muốn cap khác nhau theo type sẽ kẹt. Latent.
 - [ ] **P2-retry-budget worst-case 8.7min** — `max_retries=8 × max_countdown=65s`. Acceptable nhưng monitor SLO.

@@ -74,6 +74,10 @@ class DuplicateOrderError(MiddlewareError):
 class CircuitOpenError(MiddlewareError):
     retryable = True
 
+    def __init__(self, service: str, message: str = "") -> None:
+        super().__init__(message, service=service)
+        self.service = service
+
 
 class WebhookReplayError(MiddlewareError):
     retryable = False

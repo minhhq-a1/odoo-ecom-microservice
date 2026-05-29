@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from src.core.circuit_breaker import odoo_breaker, shopee_breaker
+from src.core.circuit_breaker import BREAKER_REGISTRY
 
 if TYPE_CHECKING:
     from src.core.exceptions import CircuitOpenError
@@ -22,27 +22,22 @@ SHOPEE_RL_COUNTDOWN_FALLBACK = 30
 def circuit_retry_countdown(service: str | None = None) -> int:
     """Wait until the named breaker is allowed to half-open again, + jitter.
 
-    `service` is "shopee", "odoo", or None. For None we wait the longer of the
-    two timeouts — conservative but only used when the breaker name can't be
-    parsed out of the exception.
+    `service` is a key in BREAKER_REGISTRY ("shopee", "odoo", etc.) or None.
+    For None or unknown services we wait the max of all registered breakers —
+    conservative but only used when the service can't be identified.
     """
-    if service == "shopee":
-        return shopee_breaker.open_timeout + 5
-    if service == "odoo":
-        return odoo_breaker.open_timeout + 5
-    return max(odoo_breaker.open_timeout, shopee_breaker.open_timeout) + 5
+    if service and service in BREAKER_REGISTRY:
+        return BREAKER_REGISTRY[service].open_timeout + 5
+    return max(b.open_timeout for b in BREAKER_REGISTRY.values()) + 5
 
 
 def circuit_service_from_error(e: CircuitOpenError) -> str | None:
-    """Parse the breaker service name out of `CircuitOpenError` message.
+    """Extract the breaker service name from CircuitOpenError.
 
-    The breaker raises `CircuitOpenError(f"Circuit {self.service} is OPEN")`
-    where `self.service` is "odoo" or "shopee" today. Returns None for any
-    future third-party breaker — caller falls back to the max-timeout.
+    Returns the service attribute if present and registered, else None.
+    Caller falls back to max-timeout for unknown services.
     """
-    msg = str(e).lower()
-    if "shopee" in msg:
-        return "shopee"
-    if "odoo" in msg:
-        return "odoo"
+    service = getattr(e, "service", None)
+    if service and service in BREAKER_REGISTRY:
+        return service
     return None
