@@ -77,10 +77,10 @@ def test_product_not_found_flips_outbox_and_mapping_and_alerts(monkeypatch):
     from src.workers.order_worker import process_webhook_event
 
     result = process_webhook_event.apply(
-        kwargs=dict(
-            outbox_id=42, platform="shopee", event_type="order",
-            platform_order_id="ORD-1", payload={"x": 1},
-        ),
+        kwargs={
+            "outbox_id": 42, "platform": "shopee", "event_type": "order",
+            "platform_order_id": "ORD-1", "payload": {"x": 1},
+        },
     ).get()
 
     assert result == {"status": "dead_letter", "reason": "product_not_found", "sku": "MISSING-SKU"}
@@ -130,10 +130,10 @@ def test_product_not_found_alert_failure_preserves_dead_letter_return(monkeypatc
     from src.workers.order_worker import process_webhook_event
 
     result = process_webhook_event.apply(
-        kwargs=dict(
-            outbox_id=43, platform="shopee", event_type="order",
-            platform_order_id="ORD-2", payload={"x": 1},
-        ),
+        kwargs={
+            "outbox_id": 43, "platform": "shopee", "event_type": "order",
+            "platform_order_id": "ORD-2", "payload": {"x": 1},
+        },
     ).get()
 
     assert result == {"status": "dead_letter", "reason": "product_not_found", "sku": "MISSING-SKU"}

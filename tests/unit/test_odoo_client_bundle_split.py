@@ -47,8 +47,8 @@ async def test_bundle_split_reconciles_subtotal_within_one_unit():
         lines = await client._build_order_lines([item], platform="shopee")
 
     assert len(lines) == 3
-    subtotal = sum(Decimal(str(l[2]["price_unit"])) * Decimal(l[2]["product_uom_qty"])
-                   for l in lines)
+    subtotal = sum(Decimal(str(ln[2]["price_unit"])) * Decimal(ln[2]["product_uom_qty"])
+                   for ln in lines)
     expected = item.discounted_price * Decimal(item.quantity)
     drift = abs(subtotal - expected)
     assert drift <= Decimal("1"), f"drift={drift} subtotal={subtotal} expected={expected}"
@@ -72,11 +72,11 @@ async def test_bundle_split_even_division_zero_drift():
     ):
         lines = await client._build_order_lines([item], platform="shopee")
 
-    subtotal = sum(Decimal(str(l[2]["price_unit"])) * Decimal(l[2]["product_uom_qty"])
-                   for l in lines)
+    subtotal = sum(Decimal(str(ln[2]["price_unit"])) * Decimal(ln[2]["product_uom_qty"])
+                   for ln in lines)
     assert subtotal == Decimal("100000")
     # All 4 components share equal qty=1 → each line price = 25000.
-    assert all(Decimal(str(l[2]["price_unit"])) == Decimal("25000") for l in lines)
+    assert all(Decimal(str(ln[2]["price_unit"])) == Decimal("25000") for ln in lines)
 
 
 @pytest.mark.asyncio
@@ -100,13 +100,13 @@ async def test_bundle_split_quantity_multiplier_scales_subtotal():
     ):
         lines = await client._build_order_lines([item], platform="shopee")
 
-    subtotal = sum(Decimal(str(l[2]["price_unit"])) * Decimal(l[2]["product_uom_qty"])
-                   for l in lines)
+    subtotal = sum(Decimal(str(ln[2]["price_unit"])) * Decimal(ln[2]["product_uom_qty"])
+                   for ln in lines)
     expected = item.discounted_price * Decimal(item.quantity)
     drift = abs(subtotal - expected)
     assert drift <= Decimal("1"), f"drift={drift} subtotal={subtotal} expected={expected}"
     # Qty: comp1 = 1*3 = 3, comp2 = 2*3 = 6.
-    qtys = sorted(l[2]["product_uom_qty"] for l in lines)
+    qtys = sorted(ln[2]["product_uom_qty"] for ln in lines)
     assert qtys == [3, 6]
 
 
@@ -131,10 +131,10 @@ async def test_bundle_split_last_component_splits_quantity_to_bound_drift():
     ):
         lines = await client._build_order_lines([item], platform="shopee")
 
-    subtotal = sum(Decimal(str(l[2]["price_unit"])) * Decimal(l[2]["product_uom_qty"])
-                   for l in lines)
+    subtotal = sum(Decimal(str(ln[2]["price_unit"])) * Decimal(ln[2]["product_uom_qty"])
+                   for ln in lines)
     assert abs(subtotal - Decimal("2")) <= Decimal("1")
-    assert any(l[2]["product_uom_qty"] < 4 for l in lines if "[bundle:C2]" in l[2]["name"])
+    assert any(ln[2]["product_uom_qty"] < 4 for ln in lines if "[bundle:C2]" in ln[2]["name"])
 
 
 @pytest.mark.asyncio
