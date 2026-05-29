@@ -129,7 +129,7 @@ Codex job `task-mpqcg9f1-c8b744` cancelled after 33min stuck. Rerun with `gpt-5.
 ### Phase 2 ratchet (CI debt)
 - [ ] **Coverage 35% → 70%** — add tests cho workers/connectors/admin. Raise threshold theo từng PR.
 - [ ] **mypy strict** — annotate ~130 sites (generic dict/Redis params, pydantic Url, celery stubs, drop unused `# type: ignore`). Per-module overrides trong `mypy.ini`.
-- [ ] **Node 24 actions** — upgrade `actions/checkout@v4`, `actions/setup-python@v5`, `codecov/codecov-action@v4` trước 2026-06-02 (GitHub deprecation).
+- [x] **Node 24 actions** — upgraded docker actions: build-push-action v5→v7, login-action v3→v4, setup-buildx-action v3→v4. Core actions already v4/v5. (2026-05-29)
 
 ### Low priority (chaos drills, ops)
 - [ ] **Load test scenario 3** (Odoo down 5min) — operator manual ENTER required.
