@@ -38,19 +38,16 @@ def _authenticate() -> int:
 
 
 def _bootstrap(uid: int) -> tuple[int, int]:
+    """Bootstrap test partner and product. Idempotent under concurrent runs.
+
+    Odoo product.product has UNIQUE(default_code), so concurrent creates race.
+    Try create first; on Fault (duplicate), search again. Partner has no UNIQUE
+    on name, so we rely on phone being effectively unique in test data.
+    """
     models = xmlrpc.client.ServerProxy(f"{URL}/xmlrpc/2/object", allow_none=True)
-    partner_ids = models.execute_kw(
-        DB,
-        uid,
-        PASSWORD,
-        "res.partner",
-        "search",
-        [[["name", "=", "Load Test Buyer"]]],
-        {"limit": 1},
-    )
-    if partner_ids:
-        partner_id = partner_ids[0]
-    else:
+
+    # Partner: try create first, fall back to search on duplicate
+    try:
         partner_id = models.execute_kw(
             DB,
             uid,
@@ -59,19 +56,22 @@ def _bootstrap(uid: int) -> tuple[int, int]:
             "create",
             [{"name": "Load Test Buyer", "phone": "0900000000"}],
         )
+    except xmlrpc.client.Fault:
+        partner_ids = models.execute_kw(
+            DB,
+            uid,
+            PASSWORD,
+            "res.partner",
+            "search",
+            [[["phone", "=", "0900000000"]]],
+            {"limit": 1},
+        )
+        if not partner_ids:
+            raise SystemExit("Partner bootstrap failed: create raised Fault but search found nothing")
+        partner_id = partner_ids[0]
 
-    product_ids = models.execute_kw(
-        DB,
-        uid,
-        PASSWORD,
-        "product.product",
-        "search",
-        [[["default_code", "=", "LOAD-SKU-001"]]],
-        {"limit": 1},
-    )
-    if product_ids:
-        product_id = product_ids[0]
-    else:
+    # Product: try create first, fall back to search on UNIQUE(default_code) violation
+    try:
         product_id = models.execute_kw(
             DB,
             uid,
@@ -87,6 +87,20 @@ def _bootstrap(uid: int) -> tuple[int, int]:
                 }
             ],
         )
+    except xmlrpc.client.Fault:
+        product_ids = models.execute_kw(
+            DB,
+            uid,
+            PASSWORD,
+            "product.product",
+            "search",
+            [[["default_code", "=", "LOAD-SKU-001"]]],
+            {"limit": 1},
+        )
+        if not product_ids:
+            raise SystemExit("Product bootstrap failed: create raised Fault but search found nothing")
+        product_id = product_ids[0]
+
     return partner_id, product_id
 
 
