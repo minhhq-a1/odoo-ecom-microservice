@@ -1,4 +1,5 @@
 """Shopee OAuth flow tests."""
+
 from __future__ import annotations
 
 import os
@@ -14,6 +15,7 @@ os.environ.setdefault("SHOPEE_SHOP_ID", "9999")
 
 def test_sign_public_format() -> None:
     from src.connectors.shopee.signing import sign_public
+
     sig, ts = sign_public("123", "/api/v2/x", "secret", timestamp=1700000000)
     assert len(sig) == 64
     assert int(ts) == 1700000000
@@ -22,15 +24,18 @@ def test_sign_public_format() -> None:
 def test_sign_public_excludes_access_token_and_shop_id() -> None:
     """sign_public base string MUST differ from sign_request (no token/shop suffix)."""
     from src.connectors.shopee.signing import sign_public, sign_request
+
     pub, _ = sign_public("123", "/api/v2/x", "secret", timestamp=1700000000)
-    auth, _ = sign_request("123", "/api/v2/x", "secret",
-                            access_token="atk", shop_id="42", timestamp=1700000000)
+    auth, _ = sign_request(
+        "123", "/api/v2/x", "secret", access_token="atk", shop_id="42", timestamp=1700000000
+    )
     assert pub != auth
 
 
 def test_build_auth_url_contains_required_params() -> None:
     from src.connectors.shopee.oauth import build_auth_url
     from src.core.config import settings as live_settings
+
     result = build_auth_url("https://example.com/admin/shopee/callback")
     parsed = urlparse(result.url)
     qs = parse_qs(parsed.query)
@@ -44,6 +49,7 @@ def test_build_auth_url_contains_required_params() -> None:
 
 def test_build_auth_url_rejects_relative_redirect() -> None:
     from src.connectors.shopee.oauth import build_auth_url
+
     with pytest.raises(ValueError):
         build_auth_url("/admin/callback")
 
@@ -55,9 +61,13 @@ async def test_exchange_code_success() -> None:
     class FakeResponse:
         def json(self) -> dict:
             return {
-                "access_token": "ACCESS_xxx", "refresh_token": "REFRESH_yyy",
-                "expire_in": 14400, "refresh_token_expire_in": 2_592_000,
-                "request_id": "req1", "error": "", "message": "",
+                "access_token": "ACCESS_xxx",
+                "refresh_token": "REFRESH_yyy",
+                "expire_in": 14400,
+                "refresh_token_expire_in": 2_592_000,
+                "request_id": "req1",
+                "error": "",
+                "message": "",
             }
 
     async def fake_post(self, url, **kwargs):  # type: ignore[no-untyped-def]
@@ -110,8 +120,10 @@ async def test_persist_tokens_stores_in_redis_and_skips_db_when_no_cipher() -> N
 
     mock_store = AsyncMock()
     tokens = {
-        "access_token": "ACC", "refresh_token": "REF",
-        "expire_in": 14400, "refresh_token_expire_in": 2_500_000,
+        "access_token": "ACC",
+        "refresh_token": "REF",
+        "expire_in": 14400,
+        "refresh_token_expire_in": 2_500_000,
     }
     with (
         patch("src.connectors.shopee.oauth.token_store.store_tokens", new=mock_store),

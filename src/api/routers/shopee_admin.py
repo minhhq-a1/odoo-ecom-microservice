@@ -1,4 +1,5 @@
 """Shopee OAuth admin endpoints — token status + callback handler."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -44,12 +45,14 @@ async def auth_url_endpoint(
         result = build_auth_url(redirect, state=state)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    return JSONResponse({
-        "url": result.url,
-        "timestamp": result.timestamp,
-        "sandbox": result.sandbox,
-        "state": state,
-    })
+    return JSONResponse(
+        {
+            "url": result.url,
+            "timestamp": result.timestamp,
+            "sandbox": result.sandbox,
+            "state": state,
+        }
+    )
 
 
 @router.get("/callback", response_class=HTMLResponse)

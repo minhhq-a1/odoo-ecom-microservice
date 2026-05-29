@@ -1,4 +1,5 @@
 """Odoo XML-RPC client wrapped with circuit breaker. Runs blocking call in threadpool."""
+
 from __future__ import annotations
 
 import asyncio
@@ -57,7 +58,9 @@ class _SafeTimeoutTransport(_TimeoutTransport):
 
 
 def _make_transport(url: str, timeout: float) -> xmlrpc.client.Transport:
-    return _SafeTimeoutTransport(timeout) if url.startswith("https://") else _TimeoutTransport(timeout)
+    return (
+        _SafeTimeoutTransport(timeout) if url.startswith("https://") else _TimeoutTransport(timeout)
+    )
 
 
 class OdooClient:
@@ -71,14 +74,16 @@ class OdooClient:
     @cached_property
     def _common(self) -> xmlrpc.client.ServerProxy:
         return xmlrpc.client.ServerProxy(
-            f"{self.url}/xmlrpc/2/common", allow_none=True,
+            f"{self.url}/xmlrpc/2/common",
+            allow_none=True,
             transport=_make_transport(self.url, settings.ODOO_TIMEOUT),
         )
 
     @cached_property
     def _models(self) -> xmlrpc.client.ServerProxy:
         return xmlrpc.client.ServerProxy(
-            f"{self.url}/xmlrpc/2/object", allow_none=True,
+            f"{self.url}/xmlrpc/2/object",
+            allow_none=True,
             transport=_make_transport(self.url, settings.ODOO_TIMEOUT),
         )
 
@@ -93,13 +98,21 @@ class OdooClient:
                 raise OdooPermissionError("Odoo authentication returned no uid")
         return self._uid
 
-    async def _execute(self, model: str, method: str, args: list, kwargs: dict | None = None) -> Any:
+    async def _execute(
+        self, model: str, method: str, args: list, kwargs: dict | None = None
+    ) -> Any:
         kwargs = kwargs or {}
 
         def _run() -> Any:
             try:
                 return self._models.execute_kw(
-                    self.db, self.uid, self.password, model, method, args, kwargs,
+                    self.db,
+                    self.uid,
+                    self.password,
+                    model,
+                    method,
+                    args,
+                    kwargs,
                 )
             except xmlrpc.client.Fault as e:
                 if "AccessError" in e.faultString:
@@ -113,7 +126,11 @@ class OdooClient:
         return await odoo_breaker.call(asyncio.to_thread, _run)
 
     async def search_read(
-        self, model: str, domain: list, fields: list[str], limit: int | None = None,
+        self,
+        model: str,
+        domain: list,
+        fields: list[str],
+        limit: int | None = None,
     ) -> list[dict]:
         kw: dict[str, Any] = {"fields": fields}
         if limit is not None:
@@ -133,20 +150,26 @@ class OdooClient:
         result = await self.search_read(
             "sale.order",
             [["x_platform", "=", platform], ["x_platform_order_id", "=", platform_order_id]],
-            ["id"], limit=1,
+            ["id"],
+            limit=1,
         )
         return result[0]["id"] if result else None
 
     async def get_product_id_by_sku(self, sku: str) -> int | None:
         result = await self.search_read(
-            "product.product", [["default_code", "=", sku]], ["id"], limit=1,
+            "product.product",
+            [["default_code", "=", sku]],
+            ["id"],
+            limit=1,
         )
         return result[0]["id"] if result else None
 
     async def get_stock_quantity(self, sku: str) -> int:
         result = await self.search_read(
-            "product.product", [["default_code", "=", sku]],
-            ["qty_available", "virtual_available", "id"], limit=1,
+            "product.product",
+            [["default_code", "=", sku]],
+            ["qty_available", "virtual_available", "id"],
+            limit=1,
         )
         if not result:
             return 0
@@ -154,7 +177,10 @@ class OdooClient:
 
     async def get_product_price(self, sku: str) -> float:
         result = await self.search_read(
-            "product.product", [["default_code", "=", sku]], ["lst_price"], limit=1,
+            "product.product",
+            [["default_code", "=", sku]],
+            ["lst_price"],
+            limit=1,
         )
         return float(result[0]["lst_price"]) if result else 0.0
 
@@ -166,21 +192,30 @@ class OdooClient:
 
     async def _get_pricelist_vnd(self) -> int:
         res = await self.search_read(
-            "product.pricelist", [["currency_id.name", "=", "VND"]], ["id"], limit=1,
+            "product.pricelist",
+            [["currency_id.name", "=", "VND"]],
+            ["id"],
+            limit=1,
         )
         if not res:
             raise OdooError("VND pricelist not found")
         return res[0]["id"]
 
     async def get_or_create_partner(
-        self, address: UnifiedAddress, platform: str, buyer_platform_id: str,
+        self,
+        address: UnifiedAddress,
+        platform: str,
+        buyer_platform_id: str,
     ) -> int:
         phone = normalize_vn_phone(address.phone)
         if not phone:
             phone = f"unknown-{platform}-{buyer_platform_id}"
 
         candidates = await self.search_read(
-            "res.partner", [["phone", "=", phone]], ["id", "name"], limit=10,
+            "res.partner",
+            [["phone", "=", phone]],
+            ["id", "name"],
+            limit=10,
         )
         for c in candidates:
             if fuzz.ratio((c["name"] or "").lower(), address.full_name.lower()) > 80:
@@ -189,31 +224,40 @@ class OdooClient:
         if candidates:
             logger.warning(
                 "partner_phone_collision_create_new",
-                phone=phone, existing=len(candidates), platform=platform,
+                phone=phone,
+                existing=len(candidates),
+                platform=platform,
             )
             name = f"{address.full_name} [{platform}:{buyer_platform_id[:8]}]"
         else:
             name = address.full_name
 
         country_id = await self._get_vietnam_id()
-        return await self.create("res.partner", {
-            "name": name, "phone": phone,
-            "street": address.address_line,
-            "city": address.district,
-            "comment": f"{address.ward or ''}, {address.district}, {address.province}",
-            "country_id": country_id,
-        })
+        return await self.create(
+            "res.partner",
+            {
+                "name": name,
+                "phone": phone,
+                "street": address.address_line,
+                "city": address.district,
+                "comment": f"{address.ward or ''}, {address.district}, {address.province}",
+                "country_id": country_id,
+            },
+        )
 
     async def create_sale_order(self, order: UnifiedOrder) -> tuple[int, str]:
         if settings.MIDDLEWARE_DRY_RUN:
             logger.info(
                 "dry_run_create_sale_order_skipped",
-                platform=order.platform.value, platform_order_id=order.platform_order_id,
+                platform=order.platform.value,
+                platform_order_id=order.platform_order_id,
             )
             return -1, "DRY-RUN"
 
         partner_id = await self.get_or_create_partner(
-            order.shipping_address, order.platform.value, order.buyer_platform_id,
+            order.shipping_address,
+            order.platform.value,
+            order.buyer_platform_id,
         )
         pricelist_id = await self._get_pricelist_vnd()
         lines = await self._build_order_lines(order.items, order.platform.value)
@@ -244,7 +288,9 @@ class OdooClient:
         return so_id, so[0]["name"] if so else f"SO{so_id}"
 
     async def _build_order_lines(
-        self, items: list[UnifiedOrderItem], platform: str | None = None,
+        self,
+        items: list[UnifiedOrderItem],
+        platform: str | None = None,
     ) -> list:
         """Build sale.order.line list. Expands bundle SKUs into their
         configured component lines using ProductMapping; falls back to the
@@ -267,7 +313,8 @@ class OdooClient:
                 mapping = await MappingService.get_by_platform_sku(platform, key)
             if mapping is None and platform and item.platform_item_id:
                 mapping = await MappingService.get_by_platform_sku(
-                    platform, str(item.platform_item_id),
+                    platform,
+                    str(item.platform_item_id),
                 )
 
             if mapping and mapping.get("mapping_type") == "bundle":
@@ -275,7 +322,9 @@ class OdooClient:
                 if not comps:
                     logger.warning(
                         "bundle_no_components_fallback_to_platform_sku",
-                        platform=platform, platform_sku=item.sku, mapping_id=mapping.get("id"),
+                        platform=platform,
+                        platform_sku=item.sku,
+                        mapping_id=mapping.get("id"),
                     )
                     comps = [{"odoo_sku": mapping["odoo_sku"], "quantity": 1}]
                 # Round 21 P2-21B: Decimal split with remainder-on-last-component.
@@ -296,19 +345,20 @@ class OdooClient:
                     qty = comp_qty_per_unit * item.quantity
                     price_groups: list[tuple[int, Decimal]]
                     if idx == last_idx and qty > 0:
-                        price_unit = (
-                            remaining_subtotal / Decimal(qty)
-                        ).quantize(currency_q, rounding=ROUND_HALF_UP)
+                        price_unit = (remaining_subtotal / Decimal(qty)).quantize(
+                            currency_q, rounding=ROUND_HALF_UP
+                        )
                         drift = abs(price_unit * Decimal(qty) - remaining_subtotal)
                         if drift > currency_q and qty > 1:
                             low_unit = price_unit
                             if low_unit * Decimal(qty) > remaining_subtotal:
                                 low_unit -= currency_q
                             high_unit = low_unit + currency_q
-                            high_qty = int((
-                                (remaining_subtotal - low_unit * Decimal(qty))
-                                / currency_q
-                            ).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+                            high_qty = int(
+                                (
+                                    (remaining_subtotal - low_unit * Decimal(qty)) / currency_q
+                                ).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+                            )
                             high_qty = max(0, min(qty, high_qty))
                             price_groups = [
                                 (qty - high_qty, low_unit),
@@ -326,16 +376,22 @@ class OdooClient:
                     for line_qty, line_price_unit in price_groups:
                         if line_qty <= 0:
                             continue
-                        lines.append((0, 0, {
-                            "product_id": product_id,
-                            "name": (
-                                f"{item.product_name} - {item.variant_name or ''}"
-                                f" [bundle:{comp_sku}]"
-                            ).strip(" -"),
-                            "product_uom_qty": line_qty,
-                            "price_unit": float(line_price_unit),
-                            "discount": 0,
-                        }))
+                        lines.append(
+                            (
+                                0,
+                                0,
+                                {
+                                    "product_id": product_id,
+                                    "name": (
+                                        f"{item.product_name} - {item.variant_name or ''}"
+                                        f" [bundle:{comp_sku}]"
+                                    ).strip(" -"),
+                                    "product_uom_qty": line_qty,
+                                    "price_unit": float(line_price_unit),
+                                    "discount": 0,
+                                },
+                            )
+                        )
                 continue
 
             # Simple mapping (or no mapping found): use Odoo SKU from
@@ -344,13 +400,19 @@ class OdooClient:
             product_id = await self.get_product_id_by_sku(target_sku)
             if not product_id:
                 raise ProductNotFoundError(target_sku)
-            lines.append((0, 0, {
-                "product_id": product_id,
-                "name": f"{item.product_name} - {item.variant_name or ''}".strip(" -"),
-                "product_uom_qty": item.quantity,
-                "price_unit": float(item.discounted_price),
-                "discount": 0,
-            }))
+            lines.append(
+                (
+                    0,
+                    0,
+                    {
+                        "product_id": product_id,
+                        "name": f"{item.product_name} - {item.variant_name or ''}".strip(" -"),
+                        "product_uom_qty": item.quantity,
+                        "price_unit": float(item.discounted_price),
+                        "discount": 0,
+                    },
+                )
+            )
         return lines
 
     @staticmethod

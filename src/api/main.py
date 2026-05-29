@@ -1,4 +1,5 @@
 """FastAPI app entry point."""
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -55,10 +56,12 @@ if settings.ENVIRONMENT != "production":
         # Persist auth via cookie so Swagger UI's follow-up fetch of
         # /admin/openapi.json (which drops the ?token= query) succeeds.
         resp = get_swagger_ui_html(
-            openapi_url="/admin/openapi.json", title=f"{app.title} – docs",
+            openapi_url="/admin/openapi.json",
+            title=f"{app.title} – docs",
         )
         set_admin_cookie(resp)
         return resp
+
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, limiter._rate_limit_exceeded_handler)  # type: ignore[arg-type]

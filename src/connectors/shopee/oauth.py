@@ -1,4 +1,5 @@
 """Shopee OAuth flow helpers — auth URL builder + token exchange + persistence."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -68,6 +69,7 @@ async def issue_oauth_state() -> str:
     Returned to the admin-authenticated setup wizard; consumed by the
     Shopee callback to prove the redirect originated from us."""
     import secrets
+
     r = await get_redis()
     state = secrets.token_urlsafe(32)
     await r.setex(f"shopee:oauth:state:{state}", OAUTH_STATE_TTL_SEC, "1")
@@ -113,7 +115,9 @@ async def exchange_code_for_tokens(code: str, shop_id: str) -> dict[str, Any]:
     refresh = data.get("refresh_token")
     if not access or not refresh:
         raise ShopeeAuthError(
-            "shopee", "Token exchange response missing access/refresh", data=data,
+            "shopee",
+            "Token exchange response missing access/refresh",
+            data=data,
         )
 
     expire_in = int(data.get("expire_in", 14400))
@@ -149,7 +153,9 @@ async def persist_tokens(shop_id: str, tokens: dict[str, Any]) -> None:
     )
     logger.info(
         "shopee_tokens_stored",
-        shop_id=shop_id, access_ttl_sec=access_ttl, refresh_ttl_sec=refresh_ttl,
+        shop_id=shop_id,
+        access_ttl_sec=access_ttl,
+        refresh_ttl_sec=refresh_ttl,
     )
 
 
@@ -159,6 +165,7 @@ async def _backup_to_db(shop_id: str, tokens: dict[str, Any]) -> None:
     Non-production: skip with warning to keep dev/staging frictionless."""
     try:
         from src.core.crypto import get_cipher
+
         cipher = get_cipher()
     except Exception as e:
         if settings.ENVIRONMENT == "production":
@@ -167,6 +174,7 @@ async def _backup_to_db(shop_id: str, tokens: dict[str, Any]) -> None:
                 error=str(e),
             )
             from src.core.exceptions import ConfigError
+
             raise ConfigError(
                 "Encrypted token backup is mandatory in production but "
                 f"cipher initialization failed: {e}. Check CREDENTIAL_KEYS.",
@@ -182,22 +190,28 @@ async def _backup_to_db(shop_id: str, tokens: dict[str, Any]) -> None:
     enc_access = cipher.encrypt(tokens["access_token"])
     enc_refresh = cipher.encrypt(tokens["refresh_token"])
     async with get_async_db_context() as db:
-        cfg = (await db.execute(
-            select(PlatformConfig).where(PlatformConfig.platform == "shopee"),
-        )).scalar_one_or_none()
+        cfg = (
+            await db.execute(
+                select(PlatformConfig).where(PlatformConfig.platform == "shopee"),
+            )
+        ).scalar_one_or_none()
         if cfg is None:
             cfg = PlatformConfig(
-                platform="shopee", shop_id=shop_id,
-                credentials={}, is_active=True,
+                platform="shopee",
+                shop_id=shop_id,
+                credentials={},
+                is_active=True,
             )
             db.add(cfg)
         merged: dict[str, Any] = dict(cfg.credentials or {})
-        merged.update({
-            "access_token_enc": enc_access,
-            "refresh_token_enc": enc_refresh,
-            "access_expire_in": tokens["expire_in"],
-            "refresh_token_expire_in": tokens["refresh_token_expire_in"],
-        })
+        merged.update(
+            {
+                "access_token_enc": enc_access,
+                "refresh_token_enc": enc_refresh,
+                "access_expire_in": tokens["expire_in"],
+                "refresh_token_expire_in": tokens["refresh_token_expire_in"],
+            }
+        )
         cfg.credentials = merged
         cfg.shop_id = shop_id
         await db.commit()

@@ -1,4 +1,5 @@
 """Aggregate import for all models (Alembic autogen + tests)."""
+
 from src.models.audit_log import AuditLog
 from src.models.base import Base
 from src.models.order_mapping import OrderMapping

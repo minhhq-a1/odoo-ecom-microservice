@@ -1,4 +1,5 @@
 """SQLAlchemy async engine + sync engine for Celery."""
+
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager, contextmanager
 
@@ -54,11 +55,17 @@ _sync_engine = create_engine(
 )
 
 AsyncSessionLocal = async_sessionmaker(
-    _async_engine, class_=AsyncSession, expire_on_commit=False, autoflush=False,
+    _async_engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False,
 )
 
 SyncSessionLocal = sessionmaker(
-    _sync_engine, autocommit=False, autoflush=False, expire_on_commit=False,
+    _sync_engine,
+    autocommit=False,
+    autoflush=False,
+    expire_on_commit=False,
 )
 
 

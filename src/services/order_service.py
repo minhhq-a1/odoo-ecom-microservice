@@ -1,4 +1,5 @@
 """Order service — idempotent sync to Odoo."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -41,26 +42,34 @@ class OrderService:
                 text("SELECT pg_advisory_xact_lock(hashtextextended(:k, 0))"),
                 {"k": lock_key},
             )
-            existing = (await db.execute(
-                select(OrderMapping).where(
-                    OrderMapping.platform == platform,
-                    OrderMapping.platform_order_id == platform_order_id,
-                ),
-            )).scalar_one_or_none()
+            existing = (
+                await db.execute(
+                    select(OrderMapping).where(
+                        OrderMapping.platform == platform,
+                        OrderMapping.platform_order_id == platform_order_id,
+                    ),
+                )
+            ).scalar_one_or_none()
 
             if existing and existing.status == "success":
                 await db.commit()  # release advisory lock + close txn
-                logger.info("order_sync_skipped_duplicate",
-                            platform=platform, platform_order_id=platform_order_id)
+                logger.info(
+                    "order_sync_skipped_duplicate",
+                    platform=platform,
+                    platform_order_id=platform_order_id,
+                )
                 return {"status": "skipped", "reason": "duplicate"}
 
             if existing and existing.status == "syncing":
                 age = datetime.now(UTC) - existing.updated_at
                 if age < _SYNCING_STALE_AFTER:
                     await db.commit()  # release advisory lock + close txn
-                    logger.info("order_sync_skipped_in_flight",
-                                platform=platform, platform_order_id=platform_order_id,
-                                age_seconds=age.total_seconds())
+                    logger.info(
+                        "order_sync_skipped_in_flight",
+                        platform=platform,
+                        platform_order_id=platform_order_id,
+                        age_seconds=age.total_seconds(),
+                    )
                     return {"status": "skipped", "reason": "in_flight"}
 
             mapping = existing or OrderMapping(
@@ -88,7 +97,8 @@ class OrderService:
         # Phase B — Odoo network calls happen OUTSIDE any DB lock/txn.
         try:
             odoo_existing = await self.odoo.check_order_exists(
-                platform, platform_order_id,
+                platform,
+                platform_order_id,
             )
             if odoo_existing:
                 async with get_async_db_context() as db:
@@ -120,23 +130,29 @@ class OrderService:
                 row.status = "success"
                 row.last_error = None
                 await db.commit()
-        logger.info("order_synced",
-                    platform=platform,
-                    platform_order_id=platform_order_id,
-                    odoo_order_id=odoo_id)
+        logger.info(
+            "order_synced",
+            platform=platform,
+            platform_order_id=platform_order_id,
+            odoo_order_id=odoo_id,
+        )
         return {"status": "success", "odoo_order_id": odoo_id, "odoo_order_name": odoo_name}
 
-    async def update_status(self, platform: str, platform_order_id: str,
-                            new_status: OrderStatus) -> None:
+    async def update_status(
+        self, platform: str, platform_order_id: str, new_status: OrderStatus
+    ) -> None:
         async with get_async_db_context() as db:
-            mapping = (await db.execute(
-                select(OrderMapping).where(
-                    OrderMapping.platform == platform,
-                    OrderMapping.platform_order_id == platform_order_id,
-                ),
-            )).scalar_one_or_none()
+            mapping = (
+                await db.execute(
+                    select(OrderMapping).where(
+                        OrderMapping.platform == platform,
+                        OrderMapping.platform_order_id == platform_order_id,
+                    ),
+                )
+            ).scalar_one_or_none()
             if not mapping or not mapping.odoo_order_id:
                 return
             # Simplified: caller decides status field on Odoo side
-            await self.odoo.write("sale.order", [mapping.odoo_order_id],
-                                  {"x_sync_status": "synced"})
+            await self.odoo.write(
+                "sale.order", [mapping.odoo_order_id], {"x_sync_status": "synced"}
+            )

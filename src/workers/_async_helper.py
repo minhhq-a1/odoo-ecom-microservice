@@ -7,6 +7,7 @@ loop they were first used on; closing the loop between tasks invalidates
 those pools and causes "Event loop is closed" / cross-loop errors on
 subsequent tasks. Keep the loop alive for the worker's lifetime.
 """
+
 from __future__ import annotations
 
 import asyncio

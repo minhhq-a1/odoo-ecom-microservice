@@ -1,4 +1,5 @@
 """Round 21 P2-21A: ProductNotFoundError flips OrderMapping + fires alert."""
+
 from __future__ import annotations
 
 import contextlib
@@ -34,8 +35,11 @@ class _FakeDB:
 def test_product_not_found_flips_outbox_and_mapping_and_alerts(monkeypatch):
     outbox_row = SimpleNamespace(id=42, status="processing", last_error=None)
     mapping_row = SimpleNamespace(
-        id=7, platform="shopee", platform_order_id="ORD-1",
-        status="failed", last_error=None,
+        id=7,
+        platform="shopee",
+        platform_order_id="ORD-1",
+        status="failed",
+        last_error=None,
     )
     fake_db = _FakeDB(outbox_row, mapping_row)
 
@@ -49,7 +53,8 @@ def test_product_not_found_flips_outbox_and_mapping_and_alerts(monkeypatch):
         alerts_called.append(list(ids))
 
     monkeypatch.setattr(
-        "src.core.database.get_async_db_context", _ctx,
+        "src.core.database.get_async_db_context",
+        _ctx,
     )
     monkeypatch.setattr(
         "src.services.outbox_service.OutboxService._fire_dead_letter_alerts",
@@ -71,15 +76,20 @@ def test_product_not_found_flips_outbox_and_mapping_and_alerts(monkeypatch):
 
     # Disable dry-run so the order branch runs to completion.
     monkeypatch.setattr(
-        "src.core.config.settings.MIDDLEWARE_DRY_RUN", False, raising=False,
+        "src.core.config.settings.MIDDLEWARE_DRY_RUN",
+        False,
+        raising=False,
     )
 
     from src.workers.order_worker import process_webhook_event
 
     result = process_webhook_event.apply(
         kwargs={
-            "outbox_id": 42, "platform": "shopee", "event_type": "order",
-            "platform_order_id": "ORD-1", "payload": {"x": 1},
+            "outbox_id": 42,
+            "platform": "shopee",
+            "event_type": "order",
+            "platform_order_id": "ORD-1",
+            "payload": {"x": 1},
         },
     ).get()
 
@@ -95,8 +105,11 @@ def test_product_not_found_flips_outbox_and_mapping_and_alerts(monkeypatch):
 def test_product_not_found_alert_failure_preserves_dead_letter_return(monkeypatch):
     outbox_row = SimpleNamespace(id=43, status="processing", last_error=None)
     mapping_row = SimpleNamespace(
-        id=8, platform="shopee", platform_order_id="ORD-2",
-        status="failed", last_error=None,
+        id=8,
+        platform="shopee",
+        platform_order_id="ORD-2",
+        status="failed",
+        last_error=None,
     )
     fake_db = _FakeDB(outbox_row, mapping_row)
 
@@ -124,15 +137,20 @@ def test_product_not_found_alert_failure_preserves_dead_letter_return(monkeypatc
     conn_cls.return_value.__aexit__ = AsyncMock(return_value=None)
     monkeypatch.setattr("src.connectors.shopee.ShopeeConnector", conn_cls)
     monkeypatch.setattr(
-        "src.core.config.settings.MIDDLEWARE_DRY_RUN", False, raising=False,
+        "src.core.config.settings.MIDDLEWARE_DRY_RUN",
+        False,
+        raising=False,
     )
 
     from src.workers.order_worker import process_webhook_event
 
     result = process_webhook_event.apply(
         kwargs={
-            "outbox_id": 43, "platform": "shopee", "event_type": "order",
-            "platform_order_id": "ORD-2", "payload": {"x": 1},
+            "outbox_id": 43,
+            "platform": "shopee",
+            "event_type": "order",
+            "platform_order_id": "ORD-2",
+            "payload": {"x": 1},
         },
     ).get()
 

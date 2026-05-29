@@ -1,4 +1,5 @@
 """Beat-scheduled tasks: outbox relay, token refresh, reconciliation, cleanup."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -16,6 +17,7 @@ logger = get_logger(__name__)
 @shared_task(name="scheduled.relay_outbox")
 def relay_outbox() -> dict:
     from src.services.outbox_service import OutboxService
+
     return run_async(OutboxService.relay_pending(batch_size=200))
 
 
@@ -27,6 +29,7 @@ def cleanup_outbox() -> dict:
         from src.core.database import get_async_db_context
         from src.models.outbox import WebhookOutbox
         from src.models.webhook_event_log import WebhookEventLog
+
         cutoff = datetime.now(UTC) - timedelta(days=7)
         async with get_async_db_context() as db:
             # webhook_event_log keeps a FK to webhook_outbox for audit, but
@@ -34,12 +37,18 @@ def cleanup_outbox() -> dict:
             # after 7. NULL the FK on logs pointing at rows we're about to
             # delete so the delete doesn't violate referential integrity
             # (no ON DELETE behavior on the FK).
-            target_ids = (await db.execute(
-                select(WebhookOutbox.id).where(
-                    WebhookOutbox.status == "published",
-                    WebhookOutbox.published_at < cutoff,
-                ),
-            )).scalars().all()
+            target_ids = (
+                (
+                    await db.execute(
+                        select(WebhookOutbox.id).where(
+                            WebhookOutbox.status == "published",
+                            WebhookOutbox.published_at < cutoff,
+                        ),
+                    )
+                )
+                .scalars()
+                .all()
+            )
             if not target_ids:
                 return {"deleted": 0}
             await db.execute(
@@ -52,6 +61,7 @@ def cleanup_outbox() -> dict:
             )
             await db.commit()
             return {"deleted": result.rowcount or 0}
+
     return run_async(_run())
 
 
@@ -60,6 +70,7 @@ def refresh_shopee_token() -> dict:
     async def _run() -> dict:
         from src.connectors.shopee import auth as shopee_auth
         from src.services.alert_service import AlertService
+
         shop_id = settings.SHOPEE_SHOP_ID
         try:
             await shopee_auth.refresh(shop_id)
@@ -68,6 +79,7 @@ def refresh_shopee_token() -> dict:
             logger.exception("token_refresh_failed", error=str(e), shop_id=shop_id)
             await AlertService.send_token_expiring(shop_id, 0)
             return {"status": "failed", "error": str(e)}
+
     return run_async(_run())
 
 
@@ -91,11 +103,14 @@ def polling_fallback() -> dict:
         async with ShopeeConnector() as conn:
             while True:
                 data = await conn._request(
-                    "GET", "/api/v2/order/get_order_list",
+                    "GET",
+                    "/api/v2/order/get_order_list",
                     params={
                         "time_range_field": "update_time",
-                        "time_from": time_from, "time_to": now,
-                        "page_size": 100, "cursor": cursor,
+                        "time_from": time_from,
+                        "time_to": now,
+                        "page_size": 100,
+                        "cursor": cursor,
                     },
                 )
                 response = data.get("response", {}) or {}
@@ -127,21 +142,25 @@ def polling_fallback() -> dict:
                 if not added:
                     skipped += 1
                     continue
-                db.add(WebhookOutbox(
-                    platform="shopee",
-                    event_type="order",
-                    event_code=3,
-                    platform_order_id=order_sn,
-                    payload={"code": 3, "data": o, "_polling": True},
-                    signature="polling",
-                    status="pending",
-                ))
+                db.add(
+                    WebhookOutbox(
+                        platform="shopee",
+                        event_type="order",
+                        event_code=3,
+                        platform_order_id=order_sn,
+                        payload={"code": 3, "data": o, "_polling": True},
+                        signature="polling",
+                        status="pending",
+                    )
+                )
                 seeded += 1
             await db.commit()
         await r.expire(dedup_key, 30 * 60)
         logger.info(
             "polling_fallback_seeded",
-            polled=len(order_list), seeded=seeded, skipped=skipped,
+            polled=len(order_list),
+            seeded=seeded,
+            skipped=skipped,
         )
         return {"polled": len(order_list), "seeded": seeded, "skipped": skipped}
 
@@ -155,6 +174,7 @@ def run_reconciliation() -> dict:
 
     async def _run() -> dict:
         from src.services.reconciliation_service import ReconciliationService
+
         results = await ReconciliationService().run_all_platforms()
         return {
             "platforms": [
@@ -199,4 +219,5 @@ def retention_cleanup() -> dict:
             deleted["webhook_event_log"] = r1.rowcount or 0
             deleted["order_sync_log"] = r2.rowcount or 0
         return deleted
+
     return run_async(_run())

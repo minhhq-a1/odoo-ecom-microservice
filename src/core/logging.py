@@ -1,4 +1,5 @@
 """Structured logging via structlog. JSON output prod, console dev."""
+
 import logging
 import sys
 from typing import Any
@@ -8,11 +9,24 @@ from structlog.types import EventDict, Processor
 
 from src.core.config import settings
 
-SENSITIVE_KEYS = frozenset({
-    "password", "access_token", "refresh_token", "partner_key", "partner_secret",
-    "credentials", "x-shopee-signature", "signature", "api_key", "secret_key",
-    "admin_secret_token", "authorization", "cookie", "set-cookie",
-})
+SENSITIVE_KEYS = frozenset(
+    {
+        "password",
+        "access_token",
+        "refresh_token",
+        "partner_key",
+        "partner_secret",
+        "credentials",
+        "x-shopee-signature",
+        "signature",
+        "api_key",
+        "secret_key",
+        "admin_secret_token",
+        "authorization",
+        "cookie",
+        "set-cookie",
+    }
+)
 
 
 def redact_processor(_logger: Any, _method: str, event_dict: EventDict) -> EventDict:
@@ -43,9 +57,7 @@ def configure_logging() -> None:
             structlog.processors.dict_tracebacks,
             renderer,
         ],
-        wrapper_class=structlog.make_filtering_bound_logger(
-            getattr(logging, settings.LOG_LEVEL)
-        ),
+        wrapper_class=structlog.make_filtering_bound_logger(getattr(logging, settings.LOG_LEVEL)),
         logger_factory=structlog.PrintLoggerFactory(file=sys.stdout),
         cache_logger_on_first_use=True,
     )

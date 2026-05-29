@@ -1,4 +1,5 @@
 """Shopee → UnifiedOrder transformer."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -66,25 +67,29 @@ class ShopeeTransformer:
         for it in raw.get("item_list", []):
             unit = _D(it.get("model_original_price") or it.get("model_discounted_price"))
             disc = _D(it.get("model_discounted_price") or it.get("model_original_price"))
-            items.append(UnifiedOrderItem(
-                platform_item_id=str(it.get("item_id", "")),
-                platform_variant_id=str(it.get("model_id") or "") or None,
-                sku=it.get("model_sku") or it.get("item_sku") or "",
-                product_name=it.get("item_name", ""),
-                variant_name=it.get("model_name") or None,
-                quantity=safe_int(it.get("model_quantity_purchased")),
-                unit_price=unit,
-                discounted_price=disc,
-                discount_amount=unit - disc,
-                image_url=it.get("image_info", {}).get("image_url"),
-            ))
+            items.append(
+                UnifiedOrderItem(
+                    platform_item_id=str(it.get("item_id", "")),
+                    platform_variant_id=str(it.get("model_id") or "") or None,
+                    sku=it.get("model_sku") or it.get("item_sku") or "",
+                    product_name=it.get("item_name", ""),
+                    variant_name=it.get("model_name") or None,
+                    quantity=safe_int(it.get("model_quantity_purchased")),
+                    unit_price=unit,
+                    discounted_price=disc,
+                    discount_amount=unit - disc,
+                    image_url=it.get("image_info", {}).get("image_url"),
+                )
+            )
 
         logistics = None
         ship = raw.get("package_list") or []
         if ship:
             pkg = ship[0]
             logistics = UnifiedLogistics(
-                shipping_fee=_D(raw.get("actual_shipping_fee") or raw.get("estimated_shipping_fee")),
+                shipping_fee=_D(
+                    raw.get("actual_shipping_fee") or raw.get("estimated_shipping_fee")
+                ),
                 tracking_number=pkg.get("tracking_number"),
                 carrier_name=pkg.get("shipping_carrier"),
             )
@@ -95,7 +100,8 @@ class ShopeeTransformer:
             platform_order_sn=str(raw.get("order_sn", "")),
             status=SHOPEE_STATUS_MAP.get(raw.get("order_status", ""), OrderStatus.PENDING),
             payment_method=SHOPEE_PAYMENT_MAP.get(
-                raw.get("payment_method", ""), PaymentMethod.ONLINE,
+                raw.get("payment_method", ""),
+                PaymentMethod.ONLINE,
             ),
             buyer_platform_id=str(raw.get("buyer_user_id", "")),
             buyer_username=raw.get("buyer_username", ""),

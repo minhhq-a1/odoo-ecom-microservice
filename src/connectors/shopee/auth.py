@@ -1,4 +1,5 @@
 """Shopee token storage + refresh."""
+
 from __future__ import annotations
 
 import asyncio
@@ -13,7 +14,7 @@ from src.core.redis import get_redis
 
 logger = get_logger(__name__)
 
-ACCESS_TTL = 14_000      # 3.9h (refresh trước expire 4h)
+ACCESS_TTL = 14_000  # 3.9h (refresh trước expire 4h)
 REFRESH_TTL = 2_500_000  # ~28.9 ngày
 
 
@@ -42,8 +43,11 @@ async def get_refresh_token(shop_id: str) -> str:
 
 
 async def store_tokens(
-    shop_id: str, access_token: str, refresh_token: str,
-    access_ttl: int = ACCESS_TTL, refresh_ttl: int = REFRESH_TTL,
+    shop_id: str,
+    access_token: str,
+    refresh_token: str,
+    access_ttl: int = ACCESS_TTL,
+    refresh_ttl: int = REFRESH_TTL,
 ) -> None:
     r = await get_redis()
     await r.setex(_key("access", shop_id), access_ttl, access_token)
@@ -76,14 +80,17 @@ async def refresh(shop_id: str) -> str:
         # Shopee still accepts in practice but is not the documented
         # signature. Use sign_public to match the spec exactly.
         sign, ts = sign_public(
-            settings.SHOPEE_PARTNER_ID, path, settings.SHOPEE_PARTNER_KEY,
+            settings.SHOPEE_PARTNER_ID,
+            path,
+            settings.SHOPEE_PARTNER_KEY,
         )
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(
                 f"{settings.shopee_base_url[:-7]}{path}",
                 params={
                     "partner_id": settings.SHOPEE_PARTNER_ID,
-                    "timestamp": ts, "sign": sign,
+                    "timestamp": ts,
+                    "sign": sign,
                 },
                 json={
                     "refresh_token": refresh_token,

@@ -7,6 +7,7 @@ Run:
   locust -f tests/load/locustfile_flashsale.py \
          -H https://staging.example.com -u 50 -r 50 -t 60s --headless --csv=flashsale
 """
+
 from __future__ import annotations
 
 from locust import HttpUser, constant, task
@@ -21,7 +22,8 @@ class BurstUser(HttpUser):
     def burst(self) -> None:
         body, sig = make_order_payload()
         self.client.post(
-            "/webhook/shopee", data=body,
+            "/webhook/shopee",
+            data=body,
             headers={"X-Shopee-Signature": sig, "Content-Type": "application/json"},
             name="POST /webhook/shopee [burst]",
         )

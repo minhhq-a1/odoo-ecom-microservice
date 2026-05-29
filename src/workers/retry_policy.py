@@ -4,6 +4,7 @@ Extracted to a neutral module so order_worker and stock_worker don't couple
 through private names. Add new worker tasks here instead of importing private
 helpers from peers.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

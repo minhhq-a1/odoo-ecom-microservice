@@ -1,4 +1,5 @@
 """Mapping service — cache product_mapping in Redis."""
+
 from __future__ import annotations
 
 import json
@@ -30,7 +31,9 @@ def _k_bundle_components(mapping_id: int) -> str:
 class MappingService:
     @classmethod
     async def get_by_platform_sku(
-        cls, platform: str, platform_sku_id: str,
+        cls,
+        platform: str,
+        platform_sku_id: str,
     ) -> dict | None:
         r = await get_redis()
         cached = await r.get(_k_mapping(platform, platform_sku_id))
@@ -38,13 +41,15 @@ class MappingService:
             return json.loads(cached)
 
         async with get_async_db_context() as db:
-            m = (await db.execute(
-                select(ProductMapping).where(
-                    ProductMapping.platform == platform,
-                    ProductMapping.platform_sku_id == platform_sku_id,
-                    ProductMapping.is_active.is_(True),
-                ),
-            )).scalar_one_or_none()
+            m = (
+                await db.execute(
+                    select(ProductMapping).where(
+                        ProductMapping.platform == platform,
+                        ProductMapping.platform_sku_id == platform_sku_id,
+                        ProductMapping.is_active.is_(True),
+                    ),
+                )
+            ).scalar_one_or_none()
         if m is None:
             return None
         data = {
@@ -61,12 +66,18 @@ class MappingService:
     @classmethod
     async def list_active_for_platform(cls, platform: str) -> list[dict]:
         async with get_async_db_context() as db:
-            rows = (await db.execute(
-                select(ProductMapping).where(
-                    ProductMapping.platform == platform,
-                    ProductMapping.is_active.is_(True),
-                ),
-            )).scalars().all()
+            rows = (
+                (
+                    await db.execute(
+                        select(ProductMapping).where(
+                            ProductMapping.platform == platform,
+                            ProductMapping.is_active.is_(True),
+                        ),
+                    )
+                )
+                .scalars()
+                .all()
+            )
         return [
             {
                 "id": r.id,
@@ -87,40 +98,62 @@ class MappingService:
             return json.loads(cached)
 
         async with get_async_db_context() as db:
-            comps = (await db.execute(
-                select(ProductBundleComponent).where(
-                    ProductBundleComponent.mapping_id == mapping_id,
-                ),
-            )).scalars().all()
+            comps = (
+                (
+                    await db.execute(
+                        select(ProductBundleComponent).where(
+                            ProductBundleComponent.mapping_id == mapping_id,
+                        ),
+                    )
+                )
+                .scalars()
+                .all()
+            )
         data = [{"odoo_sku": c.odoo_sku, "quantity": c.quantity} for c in comps]
         await r.setex(_k_bundle_components(mapping_id), CACHE_TTL, json.dumps(data))
         return data
 
     @classmethod
     async def find_mappings_using_component(
-        cls, platform: str, component_sku: str,
+        cls,
+        platform: str,
+        component_sku: str,
     ) -> list[dict]:
         """Reverse lookup — return mappings where odoo_sku == component_sku OR
         any bundle component uses it. Used for stock recalc invalidation."""
         async with get_async_db_context() as db:
-            direct = (await db.execute(
-                select(ProductMapping).where(
-                    ProductMapping.platform == platform,
-                    ProductMapping.odoo_sku == component_sku,
-                    ProductMapping.is_active.is_(True),
-                ),
-            )).scalars().all()
+            direct = (
+                (
+                    await db.execute(
+                        select(ProductMapping).where(
+                            ProductMapping.platform == platform,
+                            ProductMapping.odoo_sku == component_sku,
+                            ProductMapping.is_active.is_(True),
+                        ),
+                    )
+                )
+                .scalars()
+                .all()
+            )
 
-            comp_rows = (await db.execute(
-                select(ProductMapping)
-                .join(ProductBundleComponent,
-                      ProductBundleComponent.mapping_id == ProductMapping.id)
-                .where(
-                    ProductMapping.platform == platform,
-                    ProductMapping.is_active.is_(True),
-                    ProductBundleComponent.odoo_sku == component_sku,
-                ),
-            )).scalars().all()
+            comp_rows = (
+                (
+                    await db.execute(
+                        select(ProductMapping)
+                        .join(
+                            ProductBundleComponent,
+                            ProductBundleComponent.mapping_id == ProductMapping.id,
+                        )
+                        .where(
+                            ProductMapping.platform == platform,
+                            ProductMapping.is_active.is_(True),
+                            ProductBundleComponent.odoo_sku == component_sku,
+                        ),
+                    )
+                )
+                .scalars()
+                .all()
+            )
 
         seen: set[int] = set()
         result: list[dict] = []
@@ -128,13 +161,15 @@ class MappingService:
             if m.id in seen:
                 continue
             seen.add(m.id)
-            result.append({
-                "id": m.id,
-                "platform_product_id": m.platform_product_id,
-                "platform_sku_id": m.platform_sku_id,
-                "odoo_sku": m.odoo_sku,
-                "mapping_type": m.mapping_type,
-            })
+            result.append(
+                {
+                    "id": m.id,
+                    "platform_product_id": m.platform_product_id,
+                    "platform_sku_id": m.platform_sku_id,
+                    "odoo_sku": m.odoo_sku,
+                    "mapping_type": m.mapping_type,
+                }
+            )
         return result
 
     @classmethod

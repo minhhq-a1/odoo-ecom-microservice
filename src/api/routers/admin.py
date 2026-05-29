@@ -1,4 +1,5 @@
 """Admin UI — minimal scaffold delegating heavy lifting to ADMIN_UI.md doc."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -23,17 +24,24 @@ templates = Jinja2Templates(directory="src/api/templates")
 logger = get_logger(__name__)
 
 
-async def _audit(db: AsyncSession, request: Request, action: str,
-                 target: str | None = None, payload: dict | None = None) -> None:
-    db.add(AuditLog(
-        actor="admin",
-        action=action,
-        target=target,
-        ip=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
-        payload=payload,
-        success=True,
-    ))
+async def _audit(
+    db: AsyncSession,
+    request: Request,
+    action: str,
+    target: str | None = None,
+    payload: dict | None = None,
+) -> None:
+    db.add(
+        AuditLog(
+            actor="admin",
+            action=action,
+            target=target,
+            ip=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+            payload=payload,
+            success=True,
+        )
+    )
     await db.commit()
 
 
@@ -44,20 +52,24 @@ async def dashboard(
     _: str = Depends(require_admin_token),
 ) -> HTMLResponse:
     since = datetime.now(UTC) - timedelta(hours=24)
-    rows = (await db.execute(
-        select(OrderMapping.status, func.count())
-        .where(OrderMapping.created_at >= since)
-        .group_by(OrderMapping.status),
-    )).all()
+    rows = (
+        await db.execute(
+            select(OrderMapping.status, func.count())
+            .where(OrderMapping.created_at >= since)
+            .group_by(OrderMapping.status),
+        )
+    ).all()
     order_stats = {r[0]: r[1] for r in rows}
 
     from src.services.outbox_service import OutboxService
+
     outbox_stats = await OutboxService.get_stats()
 
     # Application Redis DB holds caches/nonces, not Celery queues. Read
     # broker queue depths from the broker DB directly so the dashboard
     # reflects what Celery sees.
     from redis.asyncio import Redis as AsyncRedis
+
     broker = AsyncRedis.from_url(str(settings.CELERY_BROKER_URL), decode_responses=True)
     try:
         queue_depths = {
@@ -68,29 +80,39 @@ async def dashboard(
     finally:
         await broker.aclose()
 
-    recent_failures = (await db.execute(
-        select(OrderMapping)
-        .where(OrderMapping.status.in_(["failed", "dead_letter"]))
-        .order_by(desc(OrderMapping.updated_at))
-        .limit(10),
-    )).scalars().all()
+    recent_failures = (
+        (
+            await db.execute(
+                select(OrderMapping)
+                .where(OrderMapping.status.in_(["failed", "dead_letter"]))
+                .order_by(desc(OrderMapping.updated_at))
+                .limit(10),
+            )
+        )
+        .scalars()
+        .all()
+    )
 
-    resp = templates.TemplateResponse("admin/dashboard.html", {
-        "request": request,
-        "order_stats": order_stats,
-        "outbox_stats": outbox_stats,
-        "queue_depths": queue_depths,
-        "recent_failures": recent_failures,
-        "now": datetime.now(UTC),
-        "settings": settings,
-    })
+    resp = templates.TemplateResponse(
+        "admin/dashboard.html",
+        {
+            "request": request,
+            "order_stats": order_stats,
+            "outbox_stats": outbox_stats,
+            "queue_depths": queue_depths,
+            "recent_failures": recent_failures,
+            "now": datetime.now(UTC),
+            "settings": settings,
+        },
+    )
     set_admin_cookie(resp)
     return resp
 
 
 @router.post("/orders/{order_id}/retry")
 async def retry_order(
-    order_id: int, request: Request,
+    order_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_async_db),
     _: str = Depends(require_admin_token),
 ) -> RedirectResponse:
@@ -107,17 +129,23 @@ async def retry_order(
     # and the task was never dispatched (consistent state). If commit
     # succeeds and the subsequent dispatch raises, the audit row still
     # records operator intent and the admin can re-trigger the retry.
-    db.add(AuditLog(
-        actor="admin", action="retry_order",
-        target=f"order_mapping:{order_id}",
-        ip=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
-        payload=None, success=True,
-    ))
+    db.add(
+        AuditLog(
+            actor="admin",
+            action="retry_order",
+            target=f"order_mapping:{order_id}",
+            ip=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+            payload=None,
+            success=True,
+        )
+    )
     await db.commit()
 
     from src.workers.order_worker import sync_order_to_odoo
+
     sync_order_to_odoo.apply_async(
-        kwargs={"order_mapping_id": order_id}, queue="orders.created.normal",
+        kwargs={"order_mapping_id": order_id},
+        queue="orders.created.normal",
     )
     return RedirectResponse(url="/admin/", status_code=303)

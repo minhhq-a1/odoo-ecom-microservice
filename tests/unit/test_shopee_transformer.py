@@ -1,4 +1,5 @@
 """src.transformers.shopee unit tests."""
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -9,15 +10,18 @@ from src.schemas.unified import OrderStatus, Platform
 from src.transformers.shopee import SHOPEE_STATUS_MAP, ShopeeTransformer
 
 
-@pytest.mark.parametrize(("raw_status", "expected"), [
-    ("UNPAID", OrderStatus.PENDING),
-    ("READY_TO_SHIP", OrderStatus.CONFIRMED),
-    ("PROCESSED", OrderStatus.PROCESSING),
-    ("SHIPPED", OrderStatus.SHIPPED),
-    ("COMPLETED", OrderStatus.DELIVERED),
-    ("CANCELLED", OrderStatus.CANCELLED),
-    ("TO_RETURN", OrderStatus.RETURN_REQUESTED),
-])
+@pytest.mark.parametrize(
+    ("raw_status", "expected"),
+    [
+        ("UNPAID", OrderStatus.PENDING),
+        ("READY_TO_SHIP", OrderStatus.CONFIRMED),
+        ("PROCESSED", OrderStatus.PROCESSING),
+        ("SHIPPED", OrderStatus.SHIPPED),
+        ("COMPLETED", OrderStatus.DELIVERED),
+        ("CANCELLED", OrderStatus.CANCELLED),
+        ("TO_RETURN", OrderStatus.RETURN_REQUESTED),
+    ],
+)
 def test_status_mapping(raw_status: str, expected: OrderStatus) -> None:
     assert SHOPEE_STATUS_MAP[raw_status] == expected
 
@@ -37,9 +41,15 @@ def test_transform_basic(shopee_order_detail_raw: dict) -> None:
 
 def test_transform_phone_normalize() -> None:
     raw = {
-        "order_sn": "X", "order_status": "UNPAID",
-        "recipient_address": {"phone": "+84-901-234-567", "name": "A",
-                              "full_address": "x", "district": "x", "state": "x"},
+        "order_sn": "X",
+        "order_status": "UNPAID",
+        "recipient_address": {
+            "phone": "+84-901-234-567",
+            "name": "A",
+            "full_address": "x",
+            "district": "x",
+            "state": "x",
+        },
         "item_list": [],
     }
     order = ShopeeTransformer().transform(raw)

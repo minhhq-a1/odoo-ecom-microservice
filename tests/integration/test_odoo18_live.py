@@ -8,6 +8,7 @@ Run:
   ODOO_LIVE_USER=admin ODOO_LIVE_PASSWORD=admin \
   python3 -m pytest tests/integration/test_odoo18_live.py -v
 """
+
 from __future__ import annotations
 
 import os
@@ -45,7 +46,12 @@ def test_version_is_odoo_18() -> None:
 def test_can_read_res_partner(authenticated) -> None:
     uid, models = authenticated
     count = models.execute_kw(
-        ODOO_DB, uid, ODOO_PASSWORD, "res.partner", "search_count", [[]],
+        ODOO_DB,
+        uid,
+        ODOO_PASSWORD,
+        "res.partner",
+        "search_count",
+        [[]],
     )
     assert count >= 0
 
@@ -53,8 +59,13 @@ def test_can_read_res_partner(authenticated) -> None:
 def test_vietnam_country_exists(authenticated) -> None:
     uid, models = authenticated
     rows = models.execute_kw(
-        ODOO_DB, uid, ODOO_PASSWORD, "res.country", "search_read",
-        [[["code", "=", "VN"]]], {"fields": ["id", "name"], "limit": 1},
+        ODOO_DB,
+        uid,
+        ODOO_PASSWORD,
+        "res.country",
+        "search_read",
+        [[["code", "=", "VN"]]],
+        {"fields": ["id", "name"], "limit": 1},
     )
     assert rows, "Vietnam country must exist in fresh Odoo 18 install"
     assert rows[0]["name"] in ("Vietnam", "Việt Nam")
@@ -64,7 +75,11 @@ def test_xmlrpc_paths_stable_on_odoo_18(authenticated) -> None:
     """Validates src/odoo/client.py paths still work on Odoo 18."""
     uid, models = authenticated
     res = models.execute_kw(
-        ODOO_DB, uid, ODOO_PASSWORD, "ir.model.fields", "search_count",
+        ODOO_DB,
+        uid,
+        ODOO_PASSWORD,
+        "ir.model.fields",
+        "search_count",
         [[["model", "=", "res.partner"]]],
     )
     assert res > 0

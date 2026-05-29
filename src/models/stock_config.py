@@ -1,4 +1,5 @@
 """Stock allocation config per (SKU, platform)."""
+
 from sqlalchemy import Boolean, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -15,6 +16,4 @@ class StockAllocationConfig(Base):
     buffer_pct: Mapped[float] = mapped_column(Numeric(5, 2), default=10.00, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    __table_args__ = (
-        UniqueConstraint("odoo_sku", "platform", name="uq_stock_sku_platform"),
-    )
+    __table_args__ = (UniqueConstraint("odoo_sku", "platform", name="uq_stock_sku_platform"),)

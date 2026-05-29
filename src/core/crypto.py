@@ -1,4 +1,5 @@
 """Envelope encryption for credentials at rest. Multi-key Fernet."""
+
 from __future__ import annotations
 
 from cryptography.fernet import Fernet, MultiFernet

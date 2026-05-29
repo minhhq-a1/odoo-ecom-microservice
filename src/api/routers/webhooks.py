@@ -1,4 +1,5 @@
 """Shopee + generic webhook receivers."""
+
 from __future__ import annotations
 
 import json
@@ -73,15 +74,17 @@ async def shopee_webhook(
 
     if not sig_valid:
         WEBHOOK_SIGNATURE_INVALID.labels(platform="shopee").inc()
-        db.add(WebhookEventLog(
-            platform="shopee",
-            signature=x_shopee_signature,
-            signature_valid=False,
-            body_raw=body,
-            body_size=len(body),
-            source_ip=request.client.host if request.client else None,
-            parse_error="invalid_signature",
-        ))
+        db.add(
+            WebhookEventLog(
+                platform="shopee",
+                signature=x_shopee_signature,
+                signature_valid=False,
+                body_raw=body,
+                body_size=len(body),
+                source_ip=request.client.host if request.client else None,
+                parse_error="invalid_signature",
+            )
+        )
         await db.commit()
         return {"status": "ok"}
 
@@ -91,11 +94,17 @@ async def shopee_webhook(
         data = payload.get("data", {}) or {}
         order_sn = data.get("ordersn") or data.get("order_sn")
     except (ValueError, TypeError) as e:
-        db.add(WebhookEventLog(
-            platform="shopee", signature=x_shopee_signature, signature_valid=True,
-            body_raw=body, body_size=len(body), parse_error=str(e),
-            source_ip=request.client.host if request.client else None,
-        ))
+        db.add(
+            WebhookEventLog(
+                platform="shopee",
+                signature=x_shopee_signature,
+                signature_valid=True,
+                body_raw=body,
+                body_size=len(body),
+                parse_error=str(e),
+                source_ip=request.client.host if request.client else None,
+            )
+        )
         await db.commit()
         return {"status": "ok"}
 
@@ -105,13 +114,19 @@ async def shopee_webhook(
     if event_type == "unknown":
         # Round 10 P2: persist unknown signed events to audit log so
         # retention/observability sees them. No outbox row (no consumer).
-        db.add(WebhookEventLog(
-            platform="shopee", signature=x_shopee_signature, signature_valid=True,
-            body_raw=body, body_size=len(body), event_code=event_code,
-            platform_order_id=order_sn,
-            source_ip=request.client.host if request.client else None,
-            parse_error=f"unknown_event_code={event_code}",
-        ))
+        db.add(
+            WebhookEventLog(
+                platform="shopee",
+                signature=x_shopee_signature,
+                signature_valid=True,
+                body_raw=body,
+                body_size=len(body),
+                event_code=event_code,
+                platform_order_id=order_sn,
+                source_ip=request.client.host if request.client else None,
+                parse_error=f"unknown_event_code={event_code}",
+            )
+        )
         await db.commit()
         if x_shopee_signature:
             await _mark_processed(x_shopee_signature)
@@ -119,25 +134,37 @@ async def shopee_webhook(
         return {"status": "ok"}
 
     outbox = WebhookOutbox(
-        platform="shopee", event_type=event_type, event_code=event_code,
-        platform_order_id=order_sn, payload=payload, signature=x_shopee_signature,
+        platform="shopee",
+        event_type=event_type,
+        event_code=event_code,
+        platform_order_id=order_sn,
+        payload=payload,
+        signature=x_shopee_signature,
         status="pending",
     )
     db.add(outbox)
     await db.flush()
 
-    db.add(WebhookEventLog(
-        platform="shopee", signature=x_shopee_signature, signature_valid=True,
-        body_raw=body, body_size=len(body), event_code=event_code,
-        platform_order_id=order_sn, outbox_id=outbox.id,
-        source_ip=request.client.host if request.client else None,
-    ))
+    db.add(
+        WebhookEventLog(
+            platform="shopee",
+            signature=x_shopee_signature,
+            signature_valid=True,
+            body_raw=body,
+            body_size=len(body),
+            event_code=event_code,
+            platform_order_id=order_sn,
+            outbox_id=outbox.id,
+            source_ip=request.client.host if request.client else None,
+        )
+    )
     await db.commit()
 
     if x_shopee_signature:
         await _mark_processed(x_shopee_signature)
 
     from src.services.outbox_service import OutboxService
+
     background_tasks.add_task(OutboxService.try_publish_immediately, outbox.id)
 
     return {"status": "ok"}

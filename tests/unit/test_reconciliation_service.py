@@ -1,4 +1,5 @@
 """Reconciliation service tests."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -29,8 +30,11 @@ def _make_order(order_sn: str, status: OrderStatus, total: Decimal) -> UnifiedOr
         buyer_platform_id="b1",
         buyer_username="b",
         shipping_address=UnifiedAddress(
-            full_name="a", phone="0900000000", address_line="x",
-            district="x", province="x",
+            full_name="a",
+            phone="0900000000",
+            address_line="x",
+            district="x",
+            province="x",
         ),
         items=[],
         subtotal=total,
@@ -64,19 +68,24 @@ async def test_auto_fix_only_safe_statuses(monkeypatch) -> None:
         AsyncMock(),
     )
     monkeypatch.setattr(
-        "src.services.reconciliation_service.settings.MIDDLEWARE_DRY_RUN", False,
+        "src.services.reconciliation_service.settings.MIDDLEWARE_DRY_RUN",
+        False,
         raising=False,
     )
     # Bypass REPEATABLE READ snapshot block (no real DB in unit test).
     import contextlib
+
     @contextlib.asynccontextmanager
     async def _fake_ctx():
         class _FakeDB:
             async def execute(self, *_a, **_k):
                 return None
+
         yield _FakeDB()
+
     monkeypatch.setattr(
-        "src.services.reconciliation_service.get_async_db_context", _fake_ctx,
+        "src.services.reconciliation_service.get_async_db_context",
+        _fake_ctx,
     )
 
     result = await svc.run_for_platform("shopee", date(2026, 5, 1))
@@ -98,7 +107,8 @@ async def test_dry_run_skips_reconciliation(monkeypatch) -> None:
     monkeypatch.setattr(svc, "_fetch_platform_orders", AsyncMock())
     monkeypatch.setattr(svc, "_persist", AsyncMock())
     monkeypatch.setattr(
-        "src.services.reconciliation_service.settings.MIDDLEWARE_DRY_RUN", True,
+        "src.services.reconciliation_service.settings.MIDDLEWARE_DRY_RUN",
+        True,
         raising=False,
     )
 

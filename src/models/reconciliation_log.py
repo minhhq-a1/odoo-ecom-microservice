@@ -1,4 +1,5 @@
 """Nightly reconciliation result log."""
+
 from datetime import date, datetime
 
 from sqlalchemy import Date, DateTime, Integer, String, func
@@ -22,5 +23,7 @@ class ReconciliationLog(Base):
     needs_review: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     details: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False,
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
     )

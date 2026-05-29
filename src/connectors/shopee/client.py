@@ -1,4 +1,5 @@
 """Shopee connector — async httpx client with auto token refresh + circuit breaker."""
+
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
@@ -56,7 +57,10 @@ class ShopeeConnector(BaseConnector):
         await self.aclose()
 
     async def _request(
-        self, method: str, api_path: str, *,
+        self,
+        method: str,
+        api_path: str,
+        *,
         params: dict[str, Any] | None = None,
         json_body: dict[str, Any] | None = None,
         with_auth: bool = True,
@@ -64,8 +68,11 @@ class ShopeeConnector(BaseConnector):
         async def _do() -> dict[str, Any]:
             access = await auth.get_access_token(self.shop_id) if with_auth else ""
             sign, ts = sign_request(
-                self.partner_id, api_path, self.partner_key,
-                access_token=access, shop_id=self.shop_id if with_auth else "",
+                self.partner_id,
+                api_path,
+                self.partner_key,
+                access_token=access,
+                shop_id=self.shop_id if with_auth else "",
             )
             qp: dict[str, Any] = {
                 "partner_id": self.partner_id,
@@ -102,6 +109,7 @@ class ShopeeConnector(BaseConnector):
             # Redis, we don't want it to return the same stale token we
             # just got rejected with.
             from src.core.redis import get_redis
+
             r = await get_redis()
             await r.delete(f"shopee:token:{self.shop_id}:access")
             await auth.refresh(self.shop_id)
@@ -109,7 +117,8 @@ class ShopeeConnector(BaseConnector):
 
     async def get_order_detail(self, platform_order_id: str) -> UnifiedOrder:
         data = await self._request(
-            "GET", "/api/v2/order/get_order_detail",
+            "GET",
+            "/api/v2/order/get_order_detail",
             params={
                 "order_sn_list": platform_order_id,
                 "response_optional_fields": _ORDER_DETAIL_FIELDS,
@@ -119,17 +128,20 @@ class ShopeeConnector(BaseConnector):
         if not orders:
             raise ShopeeError("shopee", f"Order {platform_order_id} not found")
         from src.transformers.shopee import ShopeeTransformer
+
         return ShopeeTransformer().transform(orders[0])
 
     async def get_orders_by_date(self, day: date) -> AsyncIterator[UnifiedOrder]:
         from src.transformers.shopee import ShopeeTransformer
+
         t = ShopeeTransformer()
         start_dt = datetime.combine(day, datetime.min.time(), tzinfo=UTC)
         end_dt = datetime.combine(day, datetime.max.time(), tzinfo=UTC)
         cursor = ""
         while True:
             data = await self._request(
-                "GET", "/api/v2/order/get_order_list",
+                "GET",
+                "/api/v2/order/get_order_list",
                 params={
                     "time_range_field": "create_time",
                     "time_from": int(start_dt.timestamp()),
@@ -142,7 +154,8 @@ class ShopeeConnector(BaseConnector):
             sn_list = [o["order_sn"] for o in response.get("order_list", [])]
             if sn_list:
                 detail = await self._request(
-                    "GET", "/api/v2/order/get_order_detail",
+                    "GET",
+                    "/api/v2/order/get_order_detail",
                     params={
                         "order_sn_list": ",".join(sn_list),
                         "response_optional_fields": _ORDER_DETAIL_FIELDS,
@@ -160,10 +173,12 @@ class ShopeeConnector(BaseConnector):
         platform_sku_id format: "item_id" (simple) or "item_id:model_id" (variant).
         """
         from src.services.mapping_service import MappingService
+
         mapping = await MappingService.get_by_platform_sku("shopee", request.sku)
         if mapping is None:
             raise ShopeeError(
-                "shopee", f"No product_mapping for platform_sku={request.sku}",
+                "shopee",
+                f"No product_mapping for platform_sku={request.sku}",
             )
 
         pid_raw = mapping["platform_product_id"]
@@ -172,7 +187,8 @@ class ShopeeConnector(BaseConnector):
             item_id = int(pid_raw)
         except (TypeError, ValueError) as e:
             raise ShopeeError(
-                "shopee", f"Invalid platform_product_id={pid_raw}",
+                "shopee",
+                f"Invalid platform_product_id={pid_raw}",
             ) from e
 
         model_id: int = 0
@@ -184,21 +200,27 @@ class ShopeeConnector(BaseConnector):
 
         body = {
             "item_id": item_id,
-            "stock_list": [{
-                "model_id": model_id,
-                "normal_stock": max(0, int(request.quantity)),
-            }],
+            "stock_list": [
+                {
+                    "model_id": model_id,
+                    "normal_stock": max(0, int(request.quantity)),
+                }
+            ],
         }
         try:
             await self._request(
-                "POST", "/api/v2/product/update_stock", json_body=body,
+                "POST",
+                "/api/v2/product/update_stock",
+                json_body=body,
             )
         except ShopeeError as e:
             code = getattr(e, "context", {}).get("code") or ""
             if code == "error_item_is_on_flash_sale":
                 logger.warning(
                     "shopee_stock_skip_flash_sale",
-                    item_id=item_id, model_id=model_id, qty=request.quantity,
+                    item_id=item_id,
+                    model_id=model_id,
+                    qty=request.quantity,
                 )
                 return
             raise
@@ -212,33 +234,41 @@ class ShopeeConnector(BaseConnector):
             model_id = int(model_raw) if model_raw else 0
         except (TypeError, ValueError) as e:
             raise ShopeeError(
-                "shopee", f"Invalid platform_sku for price update: {platform_sku!r}",
+                "shopee",
+                f"Invalid platform_sku for price update: {platform_sku!r}",
             ) from e
 
         body = {
             "item_id": item_id,
-            "price_list": [{
-                "model_id": model_id,
-                "original_price": float(price),
-            }],
+            "price_list": [
+                {
+                    "model_id": model_id,
+                    "original_price": float(price),
+                }
+            ],
         }
         try:
             await self._request(
-                "POST", "/api/v2/product/update_price", json_body=body,
+                "POST",
+                "/api/v2/product/update_price",
+                json_body=body,
             )
         except ShopeeError as e:
             code = getattr(e, "context", {}).get("code") or ""
             if code == "error_item_is_on_flash_sale":
                 logger.warning(
                     "shopee_price_skip_flash_sale",
-                    item_id=item_id, model_id=model_id, price=price,
+                    item_id=item_id,
+                    model_id=model_id,
+                    price=price,
                 )
                 return
             raise
 
     async def confirm_shipment(self, platform_order_id: str, tracking_no: str) -> None:
         await self._request(
-            "POST", "/api/v2/logistics/ship_order",
+            "POST",
+            "/api/v2/logistics/ship_order",
             json_body={
                 "order_sn": platform_order_id,
                 "pickup": {"address_id": 0, "pickup_time_id": "", "tracking_number": tracking_no},

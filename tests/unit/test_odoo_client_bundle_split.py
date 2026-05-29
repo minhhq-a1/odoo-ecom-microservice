@@ -1,4 +1,5 @@
 """Unit tests for `_build_order_lines` bundle Decimal split (Round 21 P2-21B)."""
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -37,18 +38,26 @@ async def test_bundle_split_reconciles_subtotal_within_one_unit():
 
     client = OdooClient()
     with (
-        patch("src.services.mapping_service.MappingService.get_by_platform_sku",
-              new=AsyncMock(return_value=mapping)),
-        patch("src.services.mapping_service.MappingService.get_bundle_components",
-              new=AsyncMock(return_value=components)),
-        patch.object(client, "get_product_id_by_sku",
-                     new=AsyncMock(side_effect=lambda sku: hash(sku) & 0xFFFF)),
+        patch(
+            "src.services.mapping_service.MappingService.get_by_platform_sku",
+            new=AsyncMock(return_value=mapping),
+        ),
+        patch(
+            "src.services.mapping_service.MappingService.get_bundle_components",
+            new=AsyncMock(return_value=components),
+        ),
+        patch.object(
+            client,
+            "get_product_id_by_sku",
+            new=AsyncMock(side_effect=lambda sku: hash(sku) & 0xFFFF),
+        ),
     ):
         lines = await client._build_order_lines([item], platform="shopee")
 
     assert len(lines) == 3
-    subtotal = sum(Decimal(str(ln[2]["price_unit"])) * Decimal(ln[2]["product_uom_qty"])
-                   for ln in lines)
+    subtotal = sum(
+        Decimal(str(ln[2]["price_unit"])) * Decimal(ln[2]["product_uom_qty"]) for ln in lines
+    )
     expected = item.discounted_price * Decimal(item.quantity)
     drift = abs(subtotal - expected)
     assert drift <= Decimal("1"), f"drift={drift} subtotal={subtotal} expected={expected}"
@@ -63,17 +72,21 @@ async def test_bundle_split_even_division_zero_drift():
 
     client = OdooClient()
     with (
-        patch("src.services.mapping_service.MappingService.get_by_platform_sku",
-              new=AsyncMock(return_value=mapping)),
-        patch("src.services.mapping_service.MappingService.get_bundle_components",
-              new=AsyncMock(return_value=components)),
-        patch.object(client, "get_product_id_by_sku",
-                     new=AsyncMock(side_effect=lambda sku: 100)),
+        patch(
+            "src.services.mapping_service.MappingService.get_by_platform_sku",
+            new=AsyncMock(return_value=mapping),
+        ),
+        patch(
+            "src.services.mapping_service.MappingService.get_bundle_components",
+            new=AsyncMock(return_value=components),
+        ),
+        patch.object(client, "get_product_id_by_sku", new=AsyncMock(side_effect=lambda sku: 100)),
     ):
         lines = await client._build_order_lines([item], platform="shopee")
 
-    subtotal = sum(Decimal(str(ln[2]["price_unit"])) * Decimal(ln[2]["product_uom_qty"])
-                   for ln in lines)
+    subtotal = sum(
+        Decimal(str(ln[2]["price_unit"])) * Decimal(ln[2]["product_uom_qty"]) for ln in lines
+    )
     assert subtotal == Decimal("100000")
     # All 4 components share equal qty=1 → each line price = 25000.
     assert all(Decimal(str(ln[2]["price_unit"])) == Decimal("25000") for ln in lines)
@@ -91,17 +104,21 @@ async def test_bundle_split_quantity_multiplier_scales_subtotal():
 
     client = OdooClient()
     with (
-        patch("src.services.mapping_service.MappingService.get_by_platform_sku",
-              new=AsyncMock(return_value=mapping)),
-        patch("src.services.mapping_service.MappingService.get_bundle_components",
-              new=AsyncMock(return_value=components)),
-        patch.object(client, "get_product_id_by_sku",
-                     new=AsyncMock(side_effect=lambda sku: 200)),
+        patch(
+            "src.services.mapping_service.MappingService.get_by_platform_sku",
+            new=AsyncMock(return_value=mapping),
+        ),
+        patch(
+            "src.services.mapping_service.MappingService.get_bundle_components",
+            new=AsyncMock(return_value=components),
+        ),
+        patch.object(client, "get_product_id_by_sku", new=AsyncMock(side_effect=lambda sku: 200)),
     ):
         lines = await client._build_order_lines([item], platform="shopee")
 
-    subtotal = sum(Decimal(str(ln[2]["price_unit"])) * Decimal(ln[2]["product_uom_qty"])
-                   for ln in lines)
+    subtotal = sum(
+        Decimal(str(ln[2]["price_unit"])) * Decimal(ln[2]["product_uom_qty"]) for ln in lines
+    )
     expected = item.discounted_price * Decimal(item.quantity)
     drift = abs(subtotal - expected)
     assert drift <= Decimal("1"), f"drift={drift} subtotal={subtotal} expected={expected}"
@@ -122,17 +139,21 @@ async def test_bundle_split_last_component_splits_quantity_to_bound_drift():
 
     client = OdooClient()
     with (
-        patch("src.services.mapping_service.MappingService.get_by_platform_sku",
-              new=AsyncMock(return_value=mapping)),
-        patch("src.services.mapping_service.MappingService.get_bundle_components",
-              new=AsyncMock(return_value=components)),
-        patch.object(client, "get_product_id_by_sku",
-                     new=AsyncMock(return_value=200)),
+        patch(
+            "src.services.mapping_service.MappingService.get_by_platform_sku",
+            new=AsyncMock(return_value=mapping),
+        ),
+        patch(
+            "src.services.mapping_service.MappingService.get_bundle_components",
+            new=AsyncMock(return_value=components),
+        ),
+        patch.object(client, "get_product_id_by_sku", new=AsyncMock(return_value=200)),
     ):
         lines = await client._build_order_lines([item], platform="shopee")
 
-    subtotal = sum(Decimal(str(ln[2]["price_unit"])) * Decimal(ln[2]["product_uom_qty"])
-                   for ln in lines)
+    subtotal = sum(
+        Decimal(str(ln[2]["price_unit"])) * Decimal(ln[2]["product_uom_qty"]) for ln in lines
+    )
     assert abs(subtotal - Decimal("2")) <= Decimal("1")
     assert any(ln[2]["product_uom_qty"] < 4 for ln in lines if "[bundle:C2]" in ln[2]["name"])
 
@@ -145,12 +166,15 @@ async def test_bundle_empty_components_fallback_to_platform_sku():
 
     client = OdooClient()
     with (
-        patch("src.services.mapping_service.MappingService.get_by_platform_sku",
-              new=AsyncMock(return_value=mapping)),
-        patch("src.services.mapping_service.MappingService.get_bundle_components",
-              new=AsyncMock(return_value=[])),
-        patch.object(client, "get_product_id_by_sku",
-                     new=AsyncMock(return_value=999)),
+        patch(
+            "src.services.mapping_service.MappingService.get_by_platform_sku",
+            new=AsyncMock(return_value=mapping),
+        ),
+        patch(
+            "src.services.mapping_service.MappingService.get_bundle_components",
+            new=AsyncMock(return_value=[]),
+        ),
+        patch.object(client, "get_product_id_by_sku", new=AsyncMock(return_value=999)),
     ):
         lines = await client._build_order_lines([item], platform="shopee")
 

@@ -1,4 +1,5 @@
 """Stock service — buffer + allocation + bundle expansion."""
+
 from __future__ import annotations
 
 from sqlalchemy import select
@@ -32,8 +33,7 @@ class StockService:
 
         buffer_pct = float(cfg.buffer_pct) if cfg else float(settings.DEFAULT_STOCK_BUFFER_PCT)
         allocation_pct = (
-            float(cfg.allocation_pct) if cfg
-            else float(settings.DEFAULT_SHOPEE_ALLOCATION_PCT)
+            float(cfg.allocation_pct) if cfg else float(settings.DEFAULT_SHOPEE_ALLOCATION_PCT)
         )
 
         buffered = int(odoo_stock * (1 - buffer_pct / 100))
@@ -43,23 +43,31 @@ class StockService:
     async def calculate_bundle_stock(self, platform_sku: str, platform: str) -> int:
         """Bundle stock = min(component_allocated // component_qty)."""
         async with get_async_db_context() as db:
-            mapping = (await db.execute(
-                select(ProductMapping).where(
-                    ProductMapping.platform == platform,
-                    ProductMapping.platform_sku_id == platform_sku,
-                    ProductMapping.is_active.is_(True),
-                ),
-            )).scalar_one_or_none()
+            mapping = (
+                await db.execute(
+                    select(ProductMapping).where(
+                        ProductMapping.platform == platform,
+                        ProductMapping.platform_sku_id == platform_sku,
+                        ProductMapping.is_active.is_(True),
+                    ),
+                )
+            ).scalar_one_or_none()
             if mapping is None:
                 return 0
             if mapping.mapping_type == "simple":
                 return await self.calculate_platform_stock(mapping.odoo_sku, platform)
 
-            comps = (await db.execute(
-                select(ProductBundleComponent).where(
-                    ProductBundleComponent.mapping_id == mapping.id,
-                ),
-            )).scalars().all()
+            comps = (
+                (
+                    await db.execute(
+                        select(ProductBundleComponent).where(
+                            ProductBundleComponent.mapping_id == mapping.id,
+                        ),
+                    )
+                )
+                .scalars()
+                .all()
+            )
 
         if not comps:
             return 0

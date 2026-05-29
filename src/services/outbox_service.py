@@ -1,4 +1,5 @@
 """Outbox service — try_publish_immediately + relay_pending."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -111,10 +112,10 @@ class OutboxService:
     @classmethod
     async def get_stats(cls) -> dict[str, int]:
         from sqlalchemy import func
+
         async with get_async_db_context() as db:
             result = await db.execute(
-                select(WebhookOutbox.status, func.count())
-                .group_by(WebhookOutbox.status),
+                select(WebhookOutbox.status, func.count()).group_by(WebhookOutbox.status),
             )
             return {row[0]: row[1] for row in result.all()}
 
@@ -128,6 +129,7 @@ class OutboxService:
 
         try:
             from src.workers.app import celery_app
+
             celery_app.send_task(
                 "workers.process_webhook_event",
                 kwargs={
@@ -156,7 +158,9 @@ class OutboxService:
                 entry.process_after = datetime.now(UTC) + timedelta(seconds=delay)
                 logger.warning(
                     "outbox_retry_scheduled",
-                    outbox_id=entry.id, retry_count=entry.retry_count, delay_sec=delay,
+                    outbox_id=entry.id,
+                    retry_count=entry.retry_count,
+                    delay_sec=delay,
                 )
             return False
 
@@ -173,15 +177,23 @@ class OutboxService:
         if not outbox_ids:
             return
         from src.services.alert_service import AlertService
+
         async with get_async_db_context() as db:
-            entries = (await db.execute(
-                select(WebhookOutbox).where(WebhookOutbox.id.in_(outbox_ids)),
-            )).scalars().all()
+            entries = (
+                (
+                    await db.execute(
+                        select(WebhookOutbox).where(WebhookOutbox.id.in_(outbox_ids)),
+                    )
+                )
+                .scalars()
+                .all()
+            )
         for entry in entries:
             try:
                 await AlertService.send_dead_letter_alert(entry)
             except Exception as e:
                 logger.exception(
                     "outbox_dead_letter_alert_failed",
-                    outbox_id=entry.id, error=str(e),
+                    outbox_id=entry.id,
+                    error=str(e),
                 )

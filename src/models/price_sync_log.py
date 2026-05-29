@@ -1,4 +1,5 @@
 """Price sync log."""
+
 from datetime import datetime
 from decimal import Decimal
 
@@ -19,5 +20,7 @@ class PriceSyncLog(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False)
     error_message: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False,
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
     )

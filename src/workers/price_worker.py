@@ -1,4 +1,5 @@
 """Price sync Odoo → platform."""
+
 from __future__ import annotations
 
 from celery import shared_task
@@ -44,7 +45,9 @@ def sync_price_for_sku(self, sku: str, platform: str = "shopee") -> dict:
             except Exception as e:
                 logger.exception(
                     "price_sync_failed",
-                    sku=sku, platform_sku=platform_sku, error=str(e),
+                    sku=sku,
+                    platform_sku=platform_sku,
+                    error=str(e),
                 )
                 raise
         if not results:

@@ -1,4 +1,5 @@
 """Order mapping: platform order ↔ Odoo SO."""
+
 from datetime import datetime
 
 from sqlalchemy import DateTime, Index, Integer, String, Text, UniqueConstraint
@@ -24,6 +25,10 @@ class OrderMapping(Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("platform", "platform_order_id", name="uq_order_platform_id"),
         Index("idx_order_platform_status_created", "platform", "status", "created_at"),
-        Index("idx_order_status_updated", "status", "updated_at",
-              postgresql_where="status IN ('failed', 'dead_letter')"),
+        Index(
+            "idx_order_status_updated",
+            "status",
+            "updated_at",
+            postgresql_where="status IN ('failed', 'dead_letter')",
+        ),
     )

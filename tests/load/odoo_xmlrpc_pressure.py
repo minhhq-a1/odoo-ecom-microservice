@@ -11,6 +11,7 @@ Usage:
   CONCURRENCY=8 TOTAL=200 \\
   python3 tests/load/odoo_xmlrpc_pressure.py
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -39,32 +40,52 @@ def _authenticate() -> int:
 def _bootstrap(uid: int) -> tuple[int, int]:
     models = xmlrpc.client.ServerProxy(f"{URL}/xmlrpc/2/object", allow_none=True)
     partner_ids = models.execute_kw(
-        DB, uid, PASSWORD,
-        "res.partner", "search",
-        [[["name", "=", "Load Test Buyer"]]], {"limit": 1},
+        DB,
+        uid,
+        PASSWORD,
+        "res.partner",
+        "search",
+        [[["name", "=", "Load Test Buyer"]]],
+        {"limit": 1},
     )
     if partner_ids:
         partner_id = partner_ids[0]
     else:
         partner_id = models.execute_kw(
-            DB, uid, PASSWORD,
-            "res.partner", "create",
+            DB,
+            uid,
+            PASSWORD,
+            "res.partner",
+            "create",
             [{"name": "Load Test Buyer", "phone": "0900000000"}],
         )
 
     product_ids = models.execute_kw(
-        DB, uid, PASSWORD,
-        "product.product", "search",
-        [[["default_code", "=", "LOAD-SKU-001"]]], {"limit": 1},
+        DB,
+        uid,
+        PASSWORD,
+        "product.product",
+        "search",
+        [[["default_code", "=", "LOAD-SKU-001"]]],
+        {"limit": 1},
     )
     if product_ids:
         product_id = product_ids[0]
     else:
         product_id = models.execute_kw(
-            DB, uid, PASSWORD,
-            "product.product", "create",
-            [{"name": "Load Test SKU", "default_code": "LOAD-SKU-001",
-              "list_price": 100000.0, "type": "consu"}],
+            DB,
+            uid,
+            PASSWORD,
+            "product.product",
+            "create",
+            [
+                {
+                    "name": "Load Test SKU",
+                    "default_code": "LOAD-SKU-001",
+                    "list_price": 100000.0,
+                    "type": "consu",
+                }
+            ],
         )
     return partner_id, product_id
 
@@ -73,21 +94,32 @@ def _create_order(uid: int, partner_id: int, product_id: int, order_sn: str) -> 
     models = xmlrpc.client.ServerProxy(f"{URL}/xmlrpc/2/object", allow_none=True)
     t = time.perf_counter()
     models.execute_kw(
-        DB, uid, PASSWORD,
-        "sale.order", "create",
-        [{
-            "partner_id": partner_id,
-            "client_order_ref": order_sn,
-            "x_platform": "shopee",
-            "x_platform_order_id": order_sn,
-            "x_platform_order_sn": order_sn,
-            "x_sync_status": "synced",
-            "order_line": [(0, 0, {
-                "product_id": product_id,
-                "product_uom_qty": 1.0,
-                "price_unit": 100000.0,
-            })],
-        }],
+        DB,
+        uid,
+        PASSWORD,
+        "sale.order",
+        "create",
+        [
+            {
+                "partner_id": partner_id,
+                "client_order_ref": order_sn,
+                "x_platform": "shopee",
+                "x_platform_order_id": order_sn,
+                "x_platform_order_sn": order_sn,
+                "x_sync_status": "synced",
+                "order_line": [
+                    (
+                        0,
+                        0,
+                        {
+                            "product_id": product_id,
+                            "product_uom_qty": 1.0,
+                            "price_unit": 100000.0,
+                        },
+                    )
+                ],
+            }
+        ],
     )
     return (time.perf_counter() - t) * 1000.0
 
@@ -106,7 +138,12 @@ async def main() -> None:
         order_sn = f"LOADXMLRPC{int(time.time())}{idx:06d}"
         try:
             latency = await loop.run_in_executor(
-                executor, _create_order, uid, partner_id, product_id, order_sn,
+                executor,
+                _create_order,
+                uid,
+                partner_id,
+                product_id,
+                order_sn,
             )
             return latency, True
         except Exception as e:

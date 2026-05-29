@@ -1,4 +1,5 @@
 """Async circuit breaker. Persists summary state in Redis. Prometheus instrumented."""
+
 from __future__ import annotations
 
 import asyncio

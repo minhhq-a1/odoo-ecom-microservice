@@ -10,6 +10,7 @@ Run:
   locust -f tests/load/locustfile_redis_restart.py \
          -H https://staging.example.com -u 5 -r 1 -t 3m --headless --csv=redis_restart
 """
+
 from __future__ import annotations
 
 from locust import HttpUser, between, task
@@ -24,7 +25,8 @@ class IngestUser(HttpUser):
     def shopee_order(self) -> None:
         body, sig = make_order_payload()
         self.client.post(
-            "/webhook/shopee", data=body,
+            "/webhook/shopee",
+            data=body,
             headers={"X-Shopee-Signature": sig, "Content-Type": "application/json"},
             name="POST /webhook/shopee [redis_restart]",
         )

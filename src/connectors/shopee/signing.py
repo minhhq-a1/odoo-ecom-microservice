@@ -1,4 +1,5 @@
 """HMAC-SHA256 signing for Shopee Open Platform v2."""
+
 from __future__ import annotations
 
 import hashlib

@@ -1,4 +1,5 @@
 """Product mapping + bundle components."""
+
 from datetime import datetime
 
 from sqlalchemy import (
@@ -28,13 +29,14 @@ class ProductMapping(Base):
     mapping_type: Mapped[str] = mapped_column(String(20), default="simple", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False,
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
     )
 
     __table_args__ = (
         UniqueConstraint("platform", "platform_sku_id", name="uq_product_platform_sku"),
-        Index("idx_product_odoo_sku_active", "odoo_sku",
-              postgresql_where="is_active = true"),
+        Index("idx_product_odoo_sku_active", "odoo_sku", postgresql_where="is_active = true"),
     )
 
 
@@ -43,7 +45,9 @@ class ProductBundleComponent(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     mapping_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("product_mapping.id", ondelete="CASCADE"), nullable=False,
+        Integer,
+        ForeignKey("product_mapping.id", ondelete="CASCADE"),
+        nullable=False,
     )
     odoo_sku: Mapped[str] = mapped_column(String(100), nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)

@@ -1,4 +1,5 @@
 """Replay-nonce fail-open behavior."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
@@ -37,6 +38,7 @@ async def test_redis_down_fails_open(caplog) -> None:
 @pytest.mark.asyncio
 async def test_redis_timeout_fails_open() -> None:
     from redis.exceptions import TimeoutError as RedisTimeoutError
+
     fake = AsyncMock()
     fake.exists = AsyncMock(side_effect=RedisTimeoutError("timeout"))
     with patch("src.api.routers.webhooks.get_redis", return_value=fake):

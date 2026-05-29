@@ -7,6 +7,7 @@ Run:
   locust -f tests/load/locustfile_normal.py \
          -H https://staging.example.com -u 5 -r 1 -t 10m --headless --csv=normal
 """
+
 from __future__ import annotations
 
 from locust import HttpUser, between, events, task
@@ -21,9 +22,11 @@ class WebhookUser(HttpUser):
     def shopee_order(self) -> None:
         body, sig = make_order_payload()
         with self.client.post(
-            "/webhook/shopee", data=body,
+            "/webhook/shopee",
+            data=body,
             headers={"X-Shopee-Signature": sig, "Content-Type": "application/json"},
-            catch_response=True, name="POST /webhook/shopee [order]",
+            catch_response=True,
+            name="POST /webhook/shopee [order]",
         ) as resp:
             if resp.status_code != 200:
                 resp.failure(f"status={resp.status_code} body={resp.text[:200]}")
@@ -31,11 +34,14 @@ class WebhookUser(HttpUser):
     @task(2)
     def shopee_logistics(self) -> None:
         from tests.load._payload import make_logistics_payload
+
         body, sig = make_logistics_payload()
         with self.client.post(
-            "/webhook/shopee", data=body,
+            "/webhook/shopee",
+            data=body,
             headers={"X-Shopee-Signature": sig, "Content-Type": "application/json"},
-            catch_response=True, name="POST /webhook/shopee [logistics]",
+            catch_response=True,
+            name="POST /webhook/shopee [logistics]",
         ) as resp:
             if resp.status_code != 200:
                 resp.failure(f"status={resp.status_code}")

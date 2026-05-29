@@ -1,4 +1,5 @@
 """Health + readiness + metrics."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Response
@@ -19,6 +20,7 @@ async def ready() -> Response:
     checks = await check_all()
     ok = all(c["ok"] for c in checks.values())
     import json
+
     return Response(
         content=json.dumps({"checks": checks}),
         status_code=200 if ok else 503,

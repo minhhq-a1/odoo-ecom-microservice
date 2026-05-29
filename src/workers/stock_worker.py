@@ -1,4 +1,5 @@
 """Stock worker — sync stock to platforms."""
+
 from __future__ import annotations
 
 from celery import shared_task
@@ -24,7 +25,9 @@ logger = get_logger(__name__)
 
 @shared_task(name="workers.sync_stock_for_sku", bind=True, max_retries=MAX_RETRIES)
 def sync_stock_for_sku(
-    self, odoo_sku: str, platforms: list[str] | None = None,
+    self,
+    odoo_sku: str,
+    platforms: list[str] | None = None,
 ) -> dict:
     async def _run() -> dict:
         from src.connectors.shopee import ShopeeConnector
@@ -38,7 +41,8 @@ def sync_stock_for_sku(
 
         for platform in target_platforms:
             mappings = await MappingService.find_mappings_using_component(
-                platform, odoo_sku,
+                platform,
+                odoo_sku,
             )
             if not mappings:
                 results[platform] = {"status": "no_mapping", "skipped": True}
@@ -52,18 +56,26 @@ def sync_stock_for_sku(
                     qty = await svc.calculate_bundle_stock(m["platform_sku_id"], platform)
 
                 if settings.MIDDLEWARE_DRY_RUN:
-                    logger.info("dry_run_stock_skip",
-                                odoo_sku=odoo_sku, platform=platform,
-                                platform_sku=m["platform_sku_id"], qty=qty)
+                    logger.info(
+                        "dry_run_stock_skip",
+                        odoo_sku=odoo_sku,
+                        platform=platform,
+                        platform_sku=m["platform_sku_id"],
+                        qty=qty,
+                    )
                     per_platform.append({"sku": m["platform_sku_id"], "qty": qty, "dry_run": True})
                     continue
 
                 if platform == "shopee":
                     async with ShopeeConnector() as conn:
-                        await conn.update_stock(StockUpdateRequest(
-                            platform=Platform.SHOPEE, sku=m["platform_sku_id"],
-                            quantity=qty, reason=f"sync_for_{odoo_sku}",
-                        ))
+                        await conn.update_stock(
+                            StockUpdateRequest(
+                                platform=Platform.SHOPEE,
+                                sku=m["platform_sku_id"],
+                                quantity=qty,
+                                reason=f"sync_for_{odoo_sku}",
+                            )
+                        )
                 per_platform.append({"sku": m["platform_sku_id"], "qty": qty})
             results[platform] = {"updates": per_platform}
         return results
@@ -72,18 +84,26 @@ def sync_stock_for_sku(
         return run_async(_run())
     except CircuitOpenError as e:
         countdown = circuit_retry_countdown(circuit_service_from_error(e))
-        logger.warning("circuit_open_retry_scheduled_stock",
-                       odoo_sku=odoo_sku, countdown_sec=countdown, error=str(e))
+        logger.warning(
+            "circuit_open_retry_scheduled_stock",
+            odoo_sku=odoo_sku,
+            countdown_sec=countdown,
+            error=str(e),
+        )
         raise self.retry(exc=e, countdown=countdown)
     except ShopeeRateLimitError as e:
         countdown = getattr(e, "retry_after", None) or SHOPEE_RL_COUNTDOWN_FALLBACK
-        logger.warning("shopee_rate_limit_retry_scheduled_stock",
-                       odoo_sku=odoo_sku, countdown_sec=countdown)
+        logger.warning(
+            "shopee_rate_limit_retry_scheduled_stock", odoo_sku=odoo_sku, countdown_sec=countdown
+        )
         raise self.retry(exc=e, countdown=countdown)
     except OdooConnectionError as e:
-        logger.warning("odoo_connection_retry_scheduled_stock",
-                       odoo_sku=odoo_sku,
-                       countdown_sec=ODOO_CONN_COUNTDOWN, error=str(e))
+        logger.warning(
+            "odoo_connection_retry_scheduled_stock",
+            odoo_sku=odoo_sku,
+            countdown_sec=ODOO_CONN_COUNTDOWN,
+            error=str(e),
+        )
         raise self.retry(exc=e, countdown=ODOO_CONN_COUNTDOWN)
 
 
@@ -95,6 +115,7 @@ def stock_safety_net() -> dict:
 
     async def _run() -> dict:
         from src.services.mapping_service import MappingService
+
         platforms = ["shopee"]
         total = 0
         for platform in platforms:

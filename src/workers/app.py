@@ -1,4 +1,5 @@
 """Celery app instance + beat schedule."""
+
 from __future__ import annotations
 
 from celery import Celery

@@ -1,4 +1,5 @@
 """Transactional outbox for webhook events."""
+
 from datetime import datetime
 
 from sqlalchemy import BigInteger, DateTime, Index, Integer, String, Text, func, text
@@ -23,21 +24,28 @@ class WebhookOutbox(Base):
     max_retries: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
     last_error: Mapped[str | None] = mapped_column(Text)
     process_after: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False,
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
     )
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False,
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(),
-        onupdate=func.now(), nullable=False,
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )
 
     __table_args__ = (
         Index(
             "idx_outbox_pending",
-            "status", "process_after",
+            "status",
+            "process_after",
             postgresql_where=text("status IN ('pending', 'failed')"),
         ),
         Index("idx_outbox_platform_order", "platform", "platform_order_id"),

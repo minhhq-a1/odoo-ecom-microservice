@@ -1,4 +1,5 @@
 """Base exception hierarchy."""
+
 from __future__ import annotations
 
 
@@ -32,9 +33,9 @@ class ShopeeAuthError(ShopeeError):
 
 class ShopeeRateLimitError(ShopeeError):
     def __init__(self, retry_after: int = 60, **context: object) -> None:
-        super().__init__(platform="shopee",
-                         message=f"Rate limited, retry after {retry_after}s",
-                         **context)
+        super().__init__(
+            platform="shopee", message=f"Rate limited, retry after {retry_after}s", **context
+        )
         self.retry_after = retry_after
 
 
