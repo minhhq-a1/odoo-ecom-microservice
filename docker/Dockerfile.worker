@@ -1,0 +1,26 @@
+FROM python:3.12-slim AS base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+FROM base AS builder
+COPY requirements.txt .
+RUN pip install --prefix=/install -r requirements.txt
+
+FROM base AS runtime
+COPY --from=builder /install /usr/local
+RUN useradd -u 10001 -m worker
+USER worker
+
+COPY --chown=worker:worker src/        ./src/
+COPY --chown=worker:worker migrations/ ./migrations/
+COPY --chown=worker:worker alembic.ini  ./alembic.ini
+
+CMD ["celery", "-A", "src.workers.app", "worker", "--loglevel=info"]

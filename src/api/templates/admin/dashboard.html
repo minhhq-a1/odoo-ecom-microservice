@@ -1,0 +1,53 @@
+{% extends "admin/base.html" %}
+{% set active = "dashboard" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="page-header" data-autorefresh="true">
+  <div class="page-title">Dashboard</div>
+  <div class="page-desc">Cập nhật lúc {{ now.strftime('%H:%M:%S') }} · Tự refresh 30s</div>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card success">
+    <div class="stat-val">{{ order_stats.get('success', 0) }}</div>
+    <div class="stat-label">✅ Synced (24h)</div>
+  </div>
+  <div class="stat-card {% if order_stats.get('failed', 0) > 0 %}danger{% endif %}">
+    <div class="stat-val">{{ order_stats.get('failed', 0) }}</div>
+    <div class="stat-label">❌ Failed (24h)</div>
+  </div>
+  <div class="stat-card {% if order_stats.get('dead_letter', 0) > 0 %}danger{% endif %}">
+    <div class="stat-val">{{ order_stats.get('dead_letter', 0) }}</div>
+    <div class="stat-label">💀 Dead Letter</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-val">{{ order_stats.get('pending', 0) }}</div>
+    <div class="stat-label">⏳ Pending</div>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <div class="table-header"><span class="table-title">🔴 Đơn lỗi gần đây</span></div>
+  {% if recent_failures %}
+  <table>
+    <thead><tr><th>ID</th><th>Platform</th><th>Order ID</th><th>Status</th><th>Error</th><th></th></tr></thead>
+    <tbody>
+      {% for o in recent_failures %}
+      <tr>
+        <td class="mono">{{ o.id }}</td>
+        <td>{{ o.platform }}</td>
+        <td class="mono">{{ o.platform_order_id }}</td>
+        <td>{{ o.status }}</td>
+        <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+            title="{{ o.last_error }}">{{ o.last_error or '—' }}</td>
+        <td><form method="POST" action="/admin/orders/{{ o.id }}/retry">
+          <button class="btn btn-ghost btn-sm">🔄</button></form></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state"><div class="empty-icon">✅</div><div>No errors</div></div>
+  {% endif %}
+</div>
+{% endblock %}

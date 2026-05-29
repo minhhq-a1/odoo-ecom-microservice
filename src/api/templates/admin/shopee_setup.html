@@ -1,0 +1,111 @@
+{% extends "admin/base.html" %}
+{% set active = "shopee_setup" %}
+{% block title %}Shopee Setup{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div class="page-title">🛒 Shopee OAuth Setup</div>
+  <div class="page-desc">Cấp quyền + lưu access/refresh token vào Redis</div>
+</div>
+
+{% if flash %}<div class="alert alert-success">{{ flash }}</div>{% endif %}
+
+<!-- Environment -->
+<div class="table-wrap" style="margin-bottom:16px">
+  <div class="table-header"><span class="table-title">Environment</span></div>
+  <table>
+    <tr><th style="width:30%">Partner ID</th>
+        <td class="mono">{{ partner_id or '<em>not set</em>' }}</td></tr>
+    <tr><th>Shop ID (default)</th>
+        <td class="mono">{{ shop_id or '<em>not set</em>' }}</td></tr>
+    <tr><th>Mode</th>
+        <td>
+          {% if sandbox %}<span class="badge badge-warn">SANDBOX</span>
+          {% else %}<span class="badge badge-ok">PRODUCTION</span>{% endif %}
+        </td></tr>
+    <tr><th>Callback URL (this server)</th>
+        <td class="code">{{ redirect_uri }}</td></tr>
+  </table>
+</div>
+
+<!-- Token status -->
+<div class="table-wrap" style="margin-bottom:16px">
+  <div class="table-header"><span class="table-title">Token Status — shop_id={{ status.shop_id }}</span></div>
+  <table>
+    <tr><th style="width:30%">Access Token</th>
+        <td>
+          {% if status.has_access_token %}
+            <span class="badge badge-ok">ACTIVE</span>
+            (TTL {{ status.access_ttl_seconds }}s ≈ {{ (status.access_ttl_seconds/3600)|round(1) }}h)
+          {% else %}
+            <span class="badge badge-off">MISSING</span>
+          {% endif %}
+        </td></tr>
+    <tr><th>Refresh Token</th>
+        <td>
+          {% if status.has_refresh_token %}
+            {% if status.refresh_expires_in_days < 7 %}
+              <span class="badge badge-warn">EXPIRES SOON</span>
+            {% else %}
+              <span class="badge badge-ok">ACTIVE</span>
+            {% endif %}
+            ({{ status.refresh_expires_in_days }} days)
+          {% else %}
+            <span class="badge badge-off">MISSING</span>
+          {% endif %}
+        </td></tr>
+  </table>
+</div>
+
+<!-- OAuth Flow -->
+<div class="table-wrap" style="margin-bottom:16px">
+  <div class="table-header"><span class="table-title">🔑 Authorize / Re-authorize</span></div>
+  <div style="padding:20px">
+    {% if auth_error %}
+      <div class="alert alert-danger">{{ auth_error }}</div>
+    {% elif not partner_id %}
+      <div class="alert alert-warning">
+        SHOPEE_PARTNER_ID env chưa set. Cấu hình env vars trước khi OAuth.
+      </div>
+    {% else %}
+      <p style="margin-bottom:16px">
+        1. Click button bên dưới → mở Shopee approval page (cần đăng nhập Shopee Seller Center)<br>
+        2. Approve quyền → Shopee redirect lại đây tự động → tokens lưu Redis<br>
+        3. Trang này sẽ refresh hiển thị token mới
+      </p>
+      <a href="{{ auth_link }}" target="_blank" class="btn btn-primary"
+         style="padding:10px 20px;font-size:14px">
+        🛒 Authorize Shopee →
+      </a>
+      <details style="margin-top:16px">
+        <summary style="cursor:pointer;color:var(--muted);font-size:12px">Show raw URL</summary>
+        <div class="code" style="margin-top:8px;padding:12px">{{ auth_link }}</div>
+      </details>
+    {% endif %}
+  </div>
+</div>
+
+<!-- DB Backup status -->
+<div class="table-wrap">
+  <div class="table-header"><span class="table-title">DB Backup (Fernet-encrypted)</span></div>
+  {% if cfg %}
+  <table>
+    <tr><th style="width:30%">platform_config row</th>
+        <td><span class="badge badge-ok">EXISTS</span> id={{ cfg.id }}</td></tr>
+    <tr><th>Encrypted fields stored</th>
+        <td>
+          {% if cfg.credentials %}
+            {% for k in cfg.credentials.keys() %}
+              <span class="code">{{ k }}</span>
+            {% endfor %}
+          {% else %}<em>none</em>{% endif %}
+        </td></tr>
+    <tr><th>Last updated</th>
+        <td style="color:var(--muted)">{{ cfg.updated_at.strftime('%Y-%m-%d %H:%M:%S UTC') if cfg.updated_at else '—' }}</td></tr>
+  </table>
+  {% else %}
+  <div class="empty-state" style="padding:24px">
+    <div>No DB backup yet. Complete OAuth above → tokens persisted to platform_config (encrypted if CREDENTIAL_KEYS set).</div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

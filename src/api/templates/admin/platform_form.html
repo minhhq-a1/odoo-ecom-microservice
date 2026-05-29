@@ -1,0 +1,68 @@
+{% extends "admin/base.html" %}
+{% set active = "platforms" %}
+{% block title %}{{ "New Platform" if is_new else "Edit " + row.platform }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div class="page-title">{{ "+ New Platform" if is_new else "Edit Platform: " + row.platform }}</div>
+  <div class="page-desc"><a href="/admin/config/platforms" style="color:var(--accent)">← Back to platforms</a></div>
+</div>
+
+<form method="POST" action="/admin/config/platforms" style="max-width:640px">
+  <div class="form-group">
+    <label class="form-label">Platform</label>
+    {% if is_new %}
+    <select name="platform" class="form-control" required>
+      <option value="shopee">Shopee</option>
+      <option value="lazada">Lazada</option>
+      <option value="tiktok">TikTok</option>
+    </select>
+    {% else %}
+    <input type="text" name="platform" class="form-control" value="{{ row.platform }}" readonly>
+    {% endif %}
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">Shop ID</label>
+    <input type="text" name="shop_id" class="form-control"
+           value="{{ row.shop_id if row else '' }}"
+           placeholder="123456">
+    <div class="form-hint">Shop ID từ Shopee Partner Portal</div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label class="form-label">Status</label>
+      <label class="toggle">
+        <input type="checkbox" name="is_active" {% if row is none or row.is_active %}checked{% endif %}>
+        Active
+      </label>
+      <div class="form-hint">Tắt → middleware không gọi platform này</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Dry-run mode</label>
+      <label class="toggle">
+        <input type="checkbox" name="dry_run" {% if row and row.dry_run %}checked{% endif %}>
+        Enable dry-run
+      </label>
+      <div class="form-hint">Nhận webhook + log, không write Odoo</div>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">Price Master</label>
+    <select name="price_master" class="form-control">
+      <option value="platform" {% if not row or row.price_master == 'platform' %}selected{% endif %}>
+        Platform (giá đặt trên sàn)
+      </option>
+      <option value="odoo" {% if row and row.price_master == 'odoo' %}selected{% endif %}>
+        Odoo (sync giá từ Odoo lên sàn)
+      </option>
+    </select>
+    <div class="form-hint">Chọn "odoo" + bật ENABLE_PRICE_SYNC để sync giá Odoo → sàn</div>
+  </div>
+
+  <button type="submit" class="btn btn-primary">💾 Save</button>
+  <a href="/admin/config/platforms" class="btn btn-ghost">Cancel</a>
+</form>
+{% endblock %}

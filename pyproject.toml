@@ -1,0 +1,92 @@
+[project]
+name = "odoo-ecommerce-middleware"
+version = "2.1.0"
+description = "Self-hosted middleware Odoo 18 ↔ Shopee/Lazada/TikTok"
+requires-python = ">=3.12"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["migrations/versions", ".venv"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W", "I", "N", "UP", "ASYNC", "S", "B", "A", "C4", "DTZ",
+    "ISC", "ICN", "PIE", "PT", "Q", "RET", "SIM", "TID", "TCH", "ARG",
+    "PTH", "ERA", "PD", "PGH", "PL", "TRY", "NPY", "PERF", "RUF",
+]
+ignore = [
+    "S101",     # assert in tests is fine
+    "PLR0913",  # too many args (Pydantic Settings is wide)
+    "TRY003",   # long exception messages OK in this codebase
+    "B008",     # FastAPI Depends() in defaults is idiomatic
+    "S104",     # 0.0.0.0 bind OK for containers
+    "S105",     # hardcoded password strings — we keep example defaults
+    "PLC0415",  # lazy imports inside Celery task bodies are intentional
+    "PLR2004",  # magic-number comparisons OK in this codebase
+    "PLW0603",  # global-statement OK for module-scoped caches
+    "PLR0912",  # too-many-branches — service entrypoints are wide
+    "PLR0915",  # too-many-statements — same as above
+    "RUF001",   # ambiguous unicode in strings (Vietnamese)
+    "RUF003",   # ambiguous unicode in comments (Vietnamese)
+    "TRY300",   # try/else style is a preference
+    "ARG001",   # unused fn args — FastAPI Depends() injects them
+    "ARG002",   # unused method args — see ARG001
+    "ARG003",   # unused class-method args — same
+    "B904",     # raise-without-from inside except — noisy
+    "E501",     # line-too-long — formatter handles this where it matters
+    "N802",     # function naming
+    "N806",     # local variable naming
+    "ERA001",   # commented-out code (intentional examples)
+    "PT011",    # pytest.raises too broad — fine here
+    "PLW2901",  # loop var reassignment
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S105", "S106", "S311", "ARG", "PLR2004"]
+"migrations/*" = ["E501", "ARG001"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+plugins = ["pydantic.mypy"]
+exclude = ["migrations/", "tests/", "scripts/"]
+
+[[tool.mypy.overrides]]
+module = "xmlrpc.*"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+addopts = "-ra --strict-markers --strict-config"
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+omit = ["src/api/templates/*", "tests/*", "migrations/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "@abstractmethod",
+    "if TYPE_CHECKING:",
+]
+show_missing = true
+
+[tool.bandit]
+exclude_dirs = ["tests", "migrations"]
+skips = ["B101"]

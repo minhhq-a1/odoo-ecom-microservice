@@ -1,0 +1,82 @@
+{% extends "admin/base.html" %}
+{% set active = "stock_config" %}
+{% block title %}Stock Allocation{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div class="page-title">📦 Stock Allocation Config</div>
+  <div class="page-desc">Buffer + allocation % per (SKU, platform). Tránh oversell.</div>
+</div>
+
+{% if flash %}<div class="alert alert-success">{{ flash }}</div>{% endif %}
+
+<!-- Inline add form -->
+<form method="POST" action="/admin/config/stock" style="margin-bottom:24px;padding:16px;border:1px solid var(--border);border-radius:10px;background:var(--surface)">
+  <h3 style="font-size:14px;margin-bottom:12px">+ Add / Update allocation</h3>
+  <div class="form-row" style="grid-template-columns:2fr 1fr 1fr 1fr">
+    <div class="form-group" style="margin:0">
+      <label class="form-label">Odoo SKU</label>
+      <input type="text" name="odoo_sku" class="form-control" required placeholder="SKU-001">
+    </div>
+    <div class="form-group" style="margin:0">
+      <label class="form-label">Platform</label>
+      <select name="platform" class="form-control" required>
+        <option value="shopee">shopee</option>
+        <option value="lazada">lazada</option>
+        <option value="tiktok">tiktok</option>
+      </select>
+    </div>
+    <div class="form-group" style="margin:0">
+      <label class="form-label">Allocation %</label>
+      <input type="number" name="allocation_pct" class="form-control" required min="0" max="100" step="0.01" value="100">
+    </div>
+    <div class="form-group" style="margin:0">
+      <label class="form-label">Buffer %</label>
+      <input type="number" name="buffer_pct" class="form-control" required min="0" max="100" step="0.01" value="10">
+    </div>
+  </div>
+  <div style="margin-top:12px">
+    <label class="toggle"><input type="checkbox" name="is_active" checked> Active</label>
+    <button type="submit" class="btn btn-primary" style="margin-left:16px">💾 Save</button>
+  </div>
+  <div class="form-hint" style="margin-top:8px">
+    Formula: <code>qty = max(0, odoo_stock × (1 − buffer/100) × allocation/100)</code>.
+    Ví dụ: stock=100, buffer=10%, allocation=50% → push 45 lên sàn.
+  </div>
+</form>
+
+<div class="table-wrap">
+  {% if rows %}
+  <table>
+    <thead>
+      <tr><th>Odoo SKU</th><th>Platform</th><th>Allocation %</th><th>Buffer %</th>
+          <th>Active</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td class="mono">{{ r.odoo_sku }}</td>
+        <td>{{ r.platform }}</td>
+        <td class="mono">{{ r.allocation_pct }}</td>
+        <td class="mono">{{ r.buffer_pct }}</td>
+        <td>
+          {% if r.is_active %}<span class="badge badge-ok">ON</span>
+          {% else %}<span class="badge badge-off">OFF</span>{% endif %}
+        </td>
+        <td>
+          <form method="POST" action="/admin/config/stock/{{ r.id }}/delete"
+                style="display:inline" onsubmit="return confirm('Delete?')">
+            <button class="btn btn-danger btn-sm">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-icon">📦</div>
+    <div>Chưa có rule. Default: buffer 10% + allocation 100% áp dụng nếu không tìm thấy rule.</div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

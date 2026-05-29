@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin UI — Middleware Preview</title>
+<style>
+  :root {
+    --bg:      #0f172a;
+    --surface: #1e293b;
+    --border:  #334155;
+    --accent:  #38bdf8;
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --danger:  #f87171;
+    --muted:   #94a3b8;
+    --text:    #e2e8f0;
+    --mono:    'JetBrains Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif;
+         font-size: 14px; line-height: 1.5; }
+
+  .layout  { display: flex; min-height: 100vh; }
+  .sidebar { width: 210px; background: var(--surface); border-right: 1px solid var(--border);
+             padding: 20px 0; flex-shrink: 0; }
+  .main    { flex: 1; padding: 28px; overflow-x: auto; }
+
+  .logo     { padding: 0 18px 20px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+  .logo-top { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: var(--accent); }
+  .logo-sub { font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+  .nav-item { display: flex; align-items: center; gap: 9px; padding: 9px 18px;
+              color: var(--muted); text-decoration: none; font-size: 13px;
+              border-left: 3px solid transparent; cursor: pointer; transition: all 0.15s; }
+  .nav-item:hover, .nav-item.active {
+              color: var(--text); background: rgba(255,255,255,0.04);
+              border-left-color: var(--accent); }
+  .nav-sep  { height: 1px; background: var(--border); margin: 10px 0; }
+
+  .page-title { font-size: 19px; font-weight: 700; margin-bottom: 4px; }
+  .page-sub   { color: var(--muted); font-size: 12px; margin-bottom: 22px; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+  .stat-card  { background: var(--surface); border: 1px solid var(--border);
+                border-radius: 10px; padding: 16px 18px; }
+  .stat-card.c-success { border-color: #4ade8040; }
+  .stat-card.c-danger  { border-color: #f8717140; }
+  .stat-card.c-warning { border-color: #fbbf2440; }
+  .stat-val   { font-size: 30px; font-weight: 800; line-height: 1; }
+  .stat-label { font-size: 10px; color: var(--muted); margin-top: 6px;
+                text-transform: uppercase; letter-spacing: 0.8px; }
+
+  .row-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+
+  .card       { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .card-head  { padding: 14px 18px; border-bottom: 1px solid var(--border);
+                display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 13px; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th    { padding: 9px 14px; text-align: left; font-size: 10px; font-weight: 600;
+          color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;
+          background: rgba(0,0,0,0.25); border-bottom: 1px solid var(--border); }
+  td    { padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 12px; }
+  tr:last-child td { border: none; }
+  tr:hover td { background: rgba(255,255,255,0.025); }
+
+  .badge   { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+             border-radius: 99px; font-size: 10px; font-weight: 700; }
+  .b-green { background: rgba(74,222,128,0.12); color: #4ade80; }
+  .b-red   { background: rgba(248,113,113,0.12); color: #f87171; }
+  .b-amber { background: rgba(251,191,36,0.12);  color: #fbbf24; }
+  .b-blue  { background: rgba(56,189,248,0.12);  color: #38bdf8; }
+  .b-gray  { background: rgba(148,163,184,0.12); color: #94a3b8; }
+
+  .btn    { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px;
+            border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer;
+            border: none; transition: all 0.15s; }
+  .btn-p  { background: var(--accent); color: #0f172a; }
+  .btn-p:hover { filter: brightness(1.1); }
+  .btn-d  { background: rgba(248,113,113,0.12); color: var(--danger);
+            border: 1px solid rgba(248,113,113,0.25); }
+  .btn-g  { background: rgba(255,255,255,0.06); color: var(--text);
+            border: 1px solid var(--border); }
+  .btn-g:hover { background: rgba(255,255,255,0.1); }
+
+  .mono { font-family: var(--mono); }
+
+  .alert-danger { padding: 10px 14px; background: rgba(248,113,113,0.1);
+                  border: 1px solid rgba(248,113,113,0.3); border-radius: 8px;
+                  color: var(--danger); font-size: 12px; margin-bottom: 16px; }
+
+  /* Tab system */
+  .tabs     { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 0; }
+  .tab      { padding: 9px 16px; font-size: 13px; cursor: pointer; color: var(--muted);
+              border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  /* Filters */
+  .filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  input, select { background: var(--surface); border: 1px solid var(--border);
+                  color: var(--text); padding: 7px 11px; border-radius: 6px; font-size: 12px; }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+
+  /* System status */
+  .sys-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .sys-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+              padding: 16px 18px; display: flex; align-items: center; gap: 14px; }
+  .sys-icon { font-size: 24px; }
+  .sys-name { font-size: 12px; font-weight: 600; }
+  .sys-detail { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  /* Outbox timeline */
+  .flow-line { display: flex; align-items: center; gap: 0; padding: 20px; flex-wrap: wrap; }
+  .flow-box  { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+               padding: 8px 14px; font-size: 12px; font-family: var(--mono); }
+  .flow-box.ok     { border-color: #4ade8040; color: #4ade80; background: rgba(74,222,128,0.05); }
+  .flow-box.warn   { border-color: #fbbf2440; color: #fbbf24; background: rgba(251,191,36,0.05); }
+  .flow-box.active { border-color: #38bdf840; color: #38bdf8; background: rgba(56,189,248,0.05); }
+  .flow-arr { color: var(--muted); padding: 0 8px; font-size: 16px; }
+
+  /* Toast */
+  #toast { position: fixed; bottom: 20px; right: 20px; padding: 10px 18px;
+           border-radius: 8px; font-size: 12px; font-weight: 600; z-index: 9999;
+           opacity: 0; transition: opacity 0.25s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+  #toast.s { background: #4ade80; color: #0f172a; }
+  #toast.e { background: #f87171; color: #fff; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="logo">
+    <div class="logo-top">⚡ MIDDLEWARE</div>
+    <div class="logo-sub">Odoo × E-Commerce Admin</div>
+  </div>
+  <div class="nav-item active" onclick="showTab('dashboard')">📊 Dashboard</div>
+  <div class="nav-item" onclick="showTab('orders')">📦 Đơn hàng</div>
+  <div class="nav-item" onclick="showTab('outbox')">📬 Outbox</div>
+  <div class="nav-item" onclick="showTab('stock')">🏪 Tồn kho</div>
+  <div class="nav-sep"></div>
+  <div class="nav-item" onclick="showTab('system')">🖥️ Hệ thống</div>
+  <div class="nav-item" style="margin-top:4px">🌸 Flower ↗</div>
+</nav>
+
+<!-- Main -->
+<main class="main">
+
+<!-- ── DASHBOARD ─────────────────────────────────────────────── -->
+<div id="tab-dashboard" class="tab-pane active">
+  <div class="page-title">Dashboard</div>
+  <div class="page-sub">Cập nhật lúc 14:32:05 · Tự refresh mỗi 30s</div>
+
+  <div class="stats-grid">
+    <div class="stat-card c-success">
+      <div class="stat-val" style="color:var(--success)">2,847</div>
+      <div class="stat-label">✅ Đã sync (24h)</div>
+    </div>
+    <div class="stat-card c-danger">
+      <div class="stat-val" style="color:var(--danger)">12</div>
+      <div class="stat-label">❌ Lỗi (24h)</div>
+    </div>
+    <div class="stat-card c-danger">
+      <div class="stat-val" style="color:var(--danger)">3</div>
+      <div class="stat-label">💀 Dead Letter</div>
+    </div>
+    <div class="stat-card c-warning">
+      <div class="stat-val" style="color:var(--warning)">48</div>
+      <div class="stat-label">⏳ Đang xử lý</div>
+    </div>
+  </div>
+
+  <div class="row-2col">
+    <div class="card">
+      <div class="card-head">📬 Outbox Status</div>
+      <table>
+        <thead><tr><th>Status</th><th>Số lượng</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge b-green">✓ published</span></td><td class="mono" style="font-weight:700;color:var(--success)">18,432</td></tr>
+          <tr><td><span class="badge b-amber">⏳ pending</span></td><td class="mono" style="font-weight:700;color:var(--warning)">23</td></tr>
+          <tr><td><span class="badge b-red">❌ failed</span></td><td class="mono" style="font-weight:700;color:var(--danger)">8</td></tr>
+          <tr><td><span class="badge b-red">💀 dead_letter</span></td><td class="mono" style="font-weight:700;color:var(--danger)">3</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-head">🚦 Queue Depth</div>
+      <table>
+        <thead><tr><th>Queue</th><th>Đang chờ</th></tr></thead>
+        <tbody>
+          <tr><td>High Priority</td><td class="mono" style="color:var(--success);font-weight:700">2</td></tr>
+          <tr><td>Normal</td><td class="mono" style="color:var(--warning);font-weight:700">145</td></tr>
+          <tr><td>Stock Sync</td><td class="mono" style="font-weight:700">18</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="alert-danger">⚠️ Có 3 đơn hàng ở trạng thái dead_letter. Kiểm tra và xử lý thủ công.</div>
+
+  <div class="card">
+    <div class="card-head">
+      🔴 Đơn lỗi gần đây
+      <button class="btn btn-d" onclick="toast('Đã queue retry 12 đơn','s')">🔄 Retry All Failed</button>
+    </div>
+    <table>
+      <thead><tr><th>Platform</th><th>Order ID</th><th>Odoo</th><th>Status</th><th>Retry</th><th>Lỗi</th><th></th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="badge b-blue">shopee</span></td>
+          <td class="mono">2501ABCD1234</td>
+          <td class="mono" style="color:var(--accent)">SO0842</td>
+          <td><span class="badge b-red">💀 dead_letter</span></td>
+          <td class="mono">5</td>
+          <td style="color:var(--muted);font-size:11px">SKU not found: SP-001-RED</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td><span class="badge b-blue">shopee</span></td>
+          <td class="mono">2501EFGH5678</td>
+          <td class="mono" style="color:var(--muted)">—</td>
+          <td><span class="badge b-red">❌ failed</span></td>
+          <td class="mono">3</td>
+          <td style="color:var(--muted);font-size:11px">Odoo connection timeout</td>
+          <td><button class="btn btn-g" style="padding:3px 9px;font-size:11px" onclick="toast('Đã retry đơn hàng','s')">🔄</button></td>
+        </tr>
+        <tr>
+          <td><span class="badge b-blue">shopee</span></td>
+          <td class="mono">2501IJKL9012</td>
+          <td class="mono" style="color:var(--muted)">—</td>
+          <td><span class="badge b-red">❌ failed</span></td>
+          <td class="mono">2</td>
+          <td style="color:var(--muted);font-size:11px">ValidationError: partner phone invalid</td>
+          <td><button class="btn btn-g" style="padding:3px 9px;font-size:11px" onclick="toast('Đã retry đơn hàng','s')">🔄</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── ORDERS ─────────────────────────────────────────────────── -->
+<div id="tab-orders" class="tab-pane">
+  <div class="page-title">📦 Đơn hàng</div>
+  <div class="page-sub">Tổng 2,910 đơn</div>
+
+  <div class="filters">
+    <input type="text" placeholder="🔍 Tìm Order ID..." style="min-width:200px">
+    <select><option>Tất cả trạng thái</option><option>✅ Success</option><option selected>❌ Failed</option><option>💀 Dead Letter</option></select>
+    <select><option>Tất cả sàn</option><option selected>Shopee</option></select>
+    <button class="btn btn-p">Lọc</button>
+    <button class="btn btn-g">Reset</button>
+    <button class="btn btn-d" onclick="toast('Đã queue 12 đơn để retry','s')" style="margin-left:auto">🔄 Retry All Failed</button>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead><tr><th>#</th><th>Platform</th><th>Platform Order ID</th><th>Odoo Order</th><th>Status</th><th>Retry</th><th>Thời gian</th><th>Lỗi</th><th></th></tr></thead>
+      <tbody>
+        <tr><td class="mono" style="color:var(--muted)">1045</td><td><span class="badge b-blue">shopee</span></td><td class="mono">2501ABCD1234</td><td class="mono" style="color:var(--muted)">—</td><td><span class="badge b-red">💀 dead_letter</span></td><td class="mono">5</td><td style="color:var(--muted);font-size:11px">19/01 14:12</td><td style="color:var(--muted);font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">SKU not found in Odoo: SP-001-RED</td><td></td></tr>
+        <tr><td class="mono" style="color:var(--muted)">1044</td><td><span class="badge b-blue">shopee</span></td><td class="mono">2501EFGH5678</td><td class="mono" style="color:var(--muted)">—</td><td><span class="badge b-red">❌ failed</span></td><td class="mono">3</td><td style="color:var(--muted);font-size:11px">19/01 14:08</td><td style="color:var(--muted);font-size:11px">Odoo connection timeout</td><td><button class="btn btn-g" style="padding:3px 9px;font-size:11px" onclick="toast('Đã retry','s')">🔄</button></td></tr>
+        <tr><td class="mono" style="color:var(--muted)">1043</td><td><span class="badge b-blue">shopee</span></td><td class="mono">2501IJKL9012</td><td class="mono" style="color:var(--muted)">—</td><td><span class="badge b-red">❌ failed</span></td><td class="mono">2</td><td style="color:var(--muted);font-size:11px">19/01 13:55</td><td style="color:var(--muted);font-size:11px">Phone invalid format</td><td><button class="btn btn-g" style="padding:3px 9px;font-size:11px" onclick="toast('Đã retry','s')">🔄</button></td></tr>
+        <tr><td class="mono" style="color:var(--muted)">1042</td><td><span class="badge b-blue">shopee</span></td><td class="mono">2501MNOP3456</td><td class="mono" style="color:var(--accent)">SO0841</td><td><span class="badge b-green">✓ success</span></td><td class="mono">0</td><td style="color:var(--muted);font-size:11px">19/01 13:50</td><td style="color:var(--muted)">—</td><td></td></tr>
+        <tr><td class="mono" style="color:var(--muted)">1041</td><td><span class="badge b-blue">shopee</span></td><td class="mono">2501QRST7890</td><td class="mono" style="color:var(--accent)">SO0840</td><td><span class="badge b-green">✓ success</span></td><td class="mono">0</td><td style="color:var(--muted);font-size:11px">19/01 13:48</td><td style="color:var(--muted)">—</td><td></td></tr>
+      </tbody>
+    </table>
+    <div style="display:flex;gap:6px;padding:12px 16px;border-top:1px solid var(--border)">
+      <a class="btn btn-g" style="padding:5px 10px;font-size:11px">1</a>
+      <a class="btn btn-g" style="padding:5px 10px;font-size:11px">2</a>
+      <a class="btn btn-p" style="padding:5px 10px;font-size:11px">3</a>
+      <a class="btn btn-g" style="padding:5px 10px;font-size:11px">4</a>
+      <a class="btn btn-g" style="padding:5px 10px;font-size:11px">…58</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── OUTBOX ─────────────────────────────────────────────────── -->
+<div id="tab-outbox" class="tab-pane">
+  <div class="page-title">📬 Outbox</div>
+  <div class="page-sub">Transactional outbox — đảm bảo không mất webhook event</div>
+
+  <!-- Flow diagram -->
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-head">Luồng xử lý Outbox</div>
+    <div class="flow-line">
+      <div class="flow-box ok">Shopee Webhook</div>
+      <div class="flow-arr">→</div>
+      <div class="flow-box active">FastAPI</div>
+      <div class="flow-arr">→</div>
+      <div class="flow-box ok">PostgreSQL Outbox<br><span style="font-size:10px;opacity:0.7">Lưu ngay, không mất</span></div>
+      <div class="flow-arr">→</div>
+      <div class="flow-box warn">Relay Job (30s)<br><span style="font-size:10px;opacity:0.7">hoặc ngay lập tức</span></div>
+      <div class="flow-arr">→</div>
+      <div class="flow-box active">Redis Queue</div>
+      <div class="flow-arr">→</div>
+      <div class="flow-box ok">Celery Worker</div>
+      <div class="flow-arr">→</div>
+      <div class="flow-box ok">Odoo</div>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card c-success"><div class="stat-val" style="color:var(--success)">18,432</div><div class="stat-label">✓ Published</div></div>
+    <div class="stat-card c-warning"><div class="stat-val" style="color:var(--warning)">23</div><div class="stat-label">⏳ Pending</div></div>
+    <div class="stat-card c-danger"><div class="stat-val" style="color:var(--danger)">8</div><div class="stat-label">❌ Failed</div></div>
+    <div class="stat-card c-danger"><div class="stat-val" style="color:var(--danger)">3</div><div class="stat-label">💀 Dead Letter</div></div>
+  </div>
+
+  <div class="filters">
+    <select><option>Tất cả status</option><option>pending</option><option selected>failed</option><option>dead_letter</option><option>published</option></select>
+    <button class="btn btn-p">Lọc</button>
+    <button class="btn btn-d" onclick="toast('Đã retry 8 outbox entries','s')" style="margin-left:auto">🔄 Retry All Failed</button>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead><tr><th>ID</th><th>Platform</th><th>Event</th><th>Order ID</th><th>Status</th><th>Retry</th><th>Next Attempt</th><th>Lỗi</th><th></th></tr></thead>
+      <tbody>
+        <tr><td class="mono" style="color:var(--muted)">10892</td><td><span class="badge b-blue">shopee</span></td><td><span class="badge b-gray">order</span></td><td class="mono">2501ABCD1234</td><td><span class="badge b-red">❌ failed</span></td><td class="mono">3</td><td style="font-size:11px;color:var(--warning)">5 phút nữa</td><td style="font-size:11px;color:var(--muted)">Redis connection refused</td><td><button class="btn btn-g" style="padding:3px 9px;font-size:11px" onclick="toast('Đã retry outbox entry','s')">🔄</button></td></tr>
+        <tr><td class="mono" style="color:var(--muted)">10891</td><td><span class="badge b-blue">shopee</span></td><td><span class="badge b-gray">logistics</span></td><td class="mono">2501EFGH5678</td><td><span class="badge b-red">💀 dead_letter</span></td><td class="mono">5</td><td style="font-size:11px;color:var(--muted)">—</td><td style="font-size:11px;color:var(--muted)">Max retries exceeded</td><td></td></tr>
+        <tr><td class="mono" style="color:var(--muted)">10890</td><td><span class="badge b-blue">shopee</span></td><td><span class="badge b-gray">order</span></td><td class="mono">2501IJKL9012</td><td><span class="badge b-green">✓ published</span></td><td class="mono">0</td><td style="font-size:11px;color:var(--muted)">—</td><td style="color:var(--muted)">—</td><td></td></tr>
+        <tr><td class="mono" style="color:var(--muted)">10889</td><td><span class="badge b-blue">shopee</span></td><td><span class="badge b-gray">order</span></td><td class="mono">2501MNOP3456</td><td><span class="badge b-green">✓ published</span></td><td class="mono">0</td><td style="font-size:11px;color:var(--muted)">—</td><td style="color:var(--muted)">—</td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── STOCK ─────────────────────────────────────────────────── -->
+<div id="tab-stock" class="tab-pane">
+  <div class="page-title">🏪 Tồn kho</div>
+  <div class="page-sub">Cấu hình phân bổ tồn kho theo sàn</div>
+  <div class="card">
+    <div class="card-head">Cấu hình phân bổ <button class="btn btn-p btn-sm" onclick="toast('Sync tất cả SKU','s')" style="font-size:11px;padding:4px 10px">⚡ Sync tất cả</button></div>
+    <table>
+      <thead><tr><th>SKU</th><th>Odoo Stock</th><th>Buffer</th><th>Shopee %</th><th>Shopee Qty</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        <tr><td class="mono">SP-001-RED</td><td class="mono">120</td><td class="mono" style="color:var(--muted)">10%</td><td class="mono">100%</td><td class="mono" style="color:var(--success);font-weight:700">108</td><td><span class="badge b-green">✓ synced</span></td><td><button class="btn btn-g" style="padding:3px 9px;font-size:11px" onclick="toast('Đã sync SP-001-RED','s')">⚡</button></td></tr>
+        <tr><td class="mono">SP-001-BLU</td><td class="mono">45</td><td class="mono" style="color:var(--muted)">10%</td><td class="mono">100%</td><td class="mono" style="color:var(--success);font-weight:700">40</td><td><span class="badge b-green">✓ synced</span></td><td><button class="btn btn-g" style="padding:3px 9px;font-size:11px" onclick="toast('Đã sync SP-001-BLU','s')">⚡</button></td></tr>
+        <tr><td class="mono">AO-TEE-M</td><td class="mono">0</td><td class="mono" style="color:var(--muted)">10%</td><td class="mono">100%</td><td class="mono" style="color:var(--danger);font-weight:700">0</td><td><span class="badge b-amber">⚠ out_of_stock</span></td><td><button class="btn btn-g" style="padding:3px 9px;font-size:11px" onclick="toast('Đã sync AO-TEE-M','s')">⚡</button></td></tr>
+        <tr><td class="mono">QUAN-L-XL</td><td class="mono">200</td><td class="mono" style="color:var(--muted)">10%</td><td class="mono">100%</td><td class="mono" style="color:var(--success);font-weight:700">180</td><td><span class="badge b-green">✓ synced</span></td><td><button class="btn btn-g" style="padding:3px 9px;font-size:11px" onclick="toast('Đã sync QUAN-L-XL','s')">⚡</button></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── SYSTEM ─────────────────────────────────────────────────── -->
+<div id="tab-system" class="tab-pane">
+  <div class="page-title">🖥️ Trạng thái hệ thống</div>
+  <div class="page-sub">Kiểm tra kết nối và sức khỏe các service</div>
+
+  <div class="sys-grid" style="margin-bottom:20px">
+    <div class="sys-card" style="border-color:#4ade8040"><div class="sys-icon">✅</div><div><div class="sys-name">PostgreSQL</div><div class="sys-detail">Response: 3ms · Connected</div></div></div>
+    <div class="sys-card" style="border-color:#4ade8040"><div class="sys-icon">✅</div><div><div class="sys-name">Redis</div><div class="sys-detail">Response: 1ms · Memory: 128MB/512MB</div></div></div>
+    <div class="sys-card" style="border-color:#4ade8040"><div class="sys-icon">✅</div><div><div class="sys-name">Odoo 17</div><div class="sys-detail">Response: 245ms · 3 workers</div></div></div>
+    <div class="sys-card" style="border-color:#4ade8040"><div class="sys-icon">✅</div><div><div class="sys-name">Celery Workers</div><div class="sys-detail">4 active · 0 reserved</div></div></div>
+    <div class="sys-card" style="border-color:#fbbf2440"><div class="sys-icon">⚠️</div><div><div class="sys-name">Shopee Token</div><div class="sys-detail" style="color:var(--warning)">Hết hạn sau 1h 23m!</div></div></div>
+    <div class="sys-card" style="border-color:#4ade8040"><div class="sys-icon">✅</div><div><div class="sys-name">Shopee API</div><div class="sys-detail">Ping: OK · Rate limit: 12%</div></div></div>
+  </div>
+
+  <div class="alert-danger">⚠️ Shopee access token sắp hết hạn (còn 1h 23m). Relay job sẽ tự refresh — kiểm tra nếu không thấy refresh trong 30 phút.</div>
+</div>
+
+</main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const navItems = document.querySelectorAll('.nav-item');
+function showTab(name) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  navItems.forEach((el, i) => {
+    const tabs = ['dashboard','orders','outbox','stock','','system'];
+    el.classList.toggle('active', tabs[i] === name);
+  });
+}
+navItems.forEach((el, i) => {
+  const tabs = ['dashboard','orders','outbox','stock',null,'system'];
+  if (tabs[i]) el.onclick = () => showTab(tabs[i]);
+});
+function toast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `show ${type === 's' ? 's' : 'e'}`;
+  setTimeout(() => t.className = '', 2500);
+}
+</script>
+</body>
+</html>

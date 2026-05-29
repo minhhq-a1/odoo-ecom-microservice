@@ -1,0 +1,114 @@
+{% extends "admin/base.html" %}
+{% set active = "products" %}
+{% block title %}{{ "New Mapping" if is_new else "Edit Mapping #" + row.id|string }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div class="page-title">{{ "+ New Product Mapping" if is_new else "Edit Mapping #" + row.id|string }}</div>
+  <div class="page-desc"><a href="/admin/config/products" style="color:var(--accent)">← Back</a></div>
+</div>
+
+<form method="POST" action="/admin/config/products" style="max-width:720px">
+  {% if not is_new %}<input type="hidden" name="mapping_id" value="{{ row.id }}">{% endif %}
+
+  <div class="form-row">
+    <div class="form-group">
+      <label class="form-label">Platform</label>
+      <select name="platform" class="form-control" required>
+        {% for p in ['shopee','lazada','tiktok'] %}
+        <option value="{{ p }}" {% if row and row.platform == p %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Mapping Type</label>
+      <select name="mapping_type" class="form-control" id="mapping_type">
+        <option value="simple" {% if not row or row.mapping_type == 'simple' %}selected{% endif %}>Simple</option>
+        <option value="bundle" {% if row and row.mapping_type == 'bundle' %}selected{% endif %}>Bundle (combo)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label class="form-label">Platform Product ID *</label>
+      <input type="text" name="platform_product_id" class="form-control" required
+             value="{{ row.platform_product_id if row else '' }}"
+             placeholder="Shopee item_id (số)">
+      <div class="form-hint">Shopee: item_id. Required cho update_stock.</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Platform SKU ID</label>
+      <input type="text" name="platform_sku_id" class="form-control"
+             value="{{ row.platform_sku_id if row else '' }}"
+             placeholder="item_id hoặc item_id:model_id (variant)">
+      <div class="form-hint">Format <code>item_id</code> hoặc <code>item_id:model_id</code> cho variant</div>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label class="form-label">Odoo Product ID *</label>
+      <input type="number" name="odoo_product_id" class="form-control" required
+             value="{{ row.odoo_product_id if row else '' }}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Odoo SKU (default_code) *</label>
+      <input type="text" name="odoo_sku" class="form-control" required
+             value="{{ row.odoo_sku if row else '' }}"
+             placeholder="SKU-001">
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label class="toggle">
+      <input type="checkbox" name="is_active" {% if not row or row.is_active %}checked{% endif %}>
+      Active
+    </label>
+  </div>
+
+  <!-- Bundle components -->
+  <div id="bundle_section" style="display:none;border-top:1px solid var(--border);padding-top:16px;margin-top:16px">
+    <h3 style="font-size:14px;margin-bottom:12px">Bundle Components</h3>
+    <div class="form-hint" style="margin-bottom:12px">
+      1 đơn bundle trên sàn → N order lines trên Odoo theo cấu hình bên dưới.
+    </div>
+    <div id="components">
+      {% if components %}
+        {% for c in components %}
+        <div class="form-row">
+          <input type="text" name="components_sku" class="form-control" value="{{ c.odoo_sku }}" placeholder="Odoo SKU">
+          <input type="number" name="components_qty" class="form-control" value="{{ c.quantity }}" min="1">
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="form-row">
+          <input type="text" name="components_sku" class="form-control" placeholder="Odoo SKU">
+          <input type="number" name="components_qty" class="form-control" value="1" min="1">
+        </div>
+      {% endif %}
+    </div>
+    <button type="button" onclick="addRow()" class="btn btn-ghost btn-sm" style="margin-top:8px">+ Add component</button>
+  </div>
+
+  <div style="margin-top:24px">
+    <button type="submit" class="btn btn-primary">💾 Save</button>
+    <a href="/admin/config/products" class="btn btn-ghost">Cancel</a>
+  </div>
+</form>
+
+<script>
+const typeSel = document.getElementById('mapping_type');
+const bundleSec = document.getElementById('bundle_section');
+function syncBundle() { bundleSec.style.display = typeSel.value === 'bundle' ? 'block' : 'none'; }
+typeSel.addEventListener('change', syncBundle);
+syncBundle();
+
+function addRow() {
+  const div = document.createElement('div');
+  div.className = 'form-row';
+  div.innerHTML = '<input type="text" name="components_sku" class="form-control" placeholder="Odoo SKU">' +
+                  '<input type="number" name="components_qty" class="form-control" value="1" min="1">';
+  document.getElementById('components').appendChild(div);
+}
+</script>
+{% endblock %}

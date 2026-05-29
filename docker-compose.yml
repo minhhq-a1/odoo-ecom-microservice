@@ -1,0 +1,98 @@
+version: "3.9"
+
+x-app-env: &app-env
+  env_file: .env
+
+services:
+  api:
+    build: { context: ., dockerfile: docker/Dockerfile }
+    <<: *app-env
+    ports: ["8000:8000"]
+    volumes: ["./src:/app/src"]
+    depends_on: [redis, postgres, pgbouncer]
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+  worker-high:
+    build: { context: ., dockerfile: docker/Dockerfile.worker }
+    <<: *app-env
+    depends_on: [redis, postgres, pgbouncer]
+    command: >
+      celery -A src.workers.app worker --loglevel=info
+      --queues=orders.created.high,shipment.confirm --concurrency=8
+      --hostname=worker-high@%h
+
+  worker-normal:
+    build: { context: ., dockerfile: docker/Dockerfile.worker }
+    <<: *app-env
+    depends_on: [redis, postgres, pgbouncer]
+    command: >
+      celery -A src.workers.app worker --loglevel=info
+      --queues=orders.created.normal,orders.updated,stock.sync,price.sync,default
+      --concurrency=8 --hostname=worker-normal@%h
+
+  worker-low:
+    build: { context: ., dockerfile: docker/Dockerfile.worker }
+    <<: *app-env
+    depends_on: [redis, postgres, pgbouncer]
+    command: >
+      celery -A src.workers.app worker --loglevel=info
+      --queues=reconciliation,reports,cleanup --concurrency=2
+      --hostname=worker-low@%h
+
+  beat:
+    build: { context: ., dockerfile: docker/Dockerfile.worker }
+    <<: *app-env
+    depends_on: [redis, postgres, pgbouncer]
+    command: celery -A src.workers.app beat --loglevel=info
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    volumes: ["redis_data:/data"]
+    # Redis here doubles as the Celery broker (DB 1) and result backend
+    # (DB 2). allkeys-lru would silently evict queue list keys under
+    # memory pressure → dropped Celery tasks. Use noeviction so the
+    # broker refuses writes instead, surfacing back-pressure clearly.
+    command: >
+      redis-server --appendonly yes --appendfsync everysec
+      --save 900 1 --save 300 10
+      --maxmemory 512mb --maxmemory-policy noeviction
+
+  postgres:
+    image: postgres:16-alpine
+    ports: ["5432:5432"]
+    environment:
+      POSTGRES_DB: middleware_db
+      POSTGRES_USER: middleware
+      POSTGRES_PASSWORD: password
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U middleware"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  pgbouncer:
+    image: edoburu/pgbouncer@sha256:85d1e38593617af1b5f7f285e97d407e56c29939683cc7cfe4c8f6dc19f1268b
+    ports: ["6432:6432"]
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: middleware
+      DB_PASSWORD: password
+      DB_NAME: middleware_db
+      AUTH_TYPE: scram-sha-256
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 200
+      DEFAULT_POOL_SIZE: 25
+    depends_on: { postgres: { condition: service_healthy } }
+
+  flower:
+    image: mher/flower:2.0
+    ports: ["5555:5555"]
+    environment: { CELERY_BROKER_URL: "redis://redis:6379/1" }
+    depends_on: [redis]
+
+volumes:
+  redis_data:
+  postgres_data:

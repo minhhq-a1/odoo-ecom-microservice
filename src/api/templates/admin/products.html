@@ -1,0 +1,71 @@
+{% extends "admin/base.html" %}
+{% set active = "products" %}
+{% block title %}Product Mapping{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div class="page-title">🔗 Product Mapping</div>
+  <div class="page-desc">Liên kết SKU sàn ↔ SKU Odoo. Bundle support cho combo.</div>
+</div>
+
+{% if flash %}<div class="alert alert-success">{{ flash }}</div>{% endif %}
+
+<form method="GET" style="margin-bottom:16px;display:flex;gap:8px;align-items:end">
+  <div class="form-group" style="margin:0">
+    <label class="form-label">Platform</label>
+    <select name="platform" class="form-control">
+      <option value="">All</option>
+      <option value="shopee" {% if platform=='shopee' %}selected{% endif %}>Shopee</option>
+      <option value="lazada" {% if platform=='lazada' %}selected{% endif %}>Lazada</option>
+      <option value="tiktok" {% if platform=='tiktok' %}selected{% endif %}>TikTok</option>
+    </select>
+  </div>
+  <div class="form-group" style="margin:0;flex:1">
+    <label class="form-label">Search SKU</label>
+    <input type="text" name="search" class="form-control" value="{{ search or '' }}"
+           placeholder="Odoo SKU or platform SKU">
+  </div>
+  <button type="submit" class="btn btn-primary">Search</button>
+  <a href="/admin/config/products/new" class="btn btn-primary">+ Add</a>
+</form>
+
+<div class="table-wrap">
+  {% if rows %}
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Platform</th><th>Platform SKU</th><th>Odoo SKU</th>
+          <th>Type</th><th>Active</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td class="mono">{{ r.id }}</td>
+        <td>{{ r.platform }}</td>
+        <td class="mono">{{ r.platform_sku_id or r.platform_product_id }}</td>
+        <td class="mono">{{ r.odoo_sku }}</td>
+        <td>
+          {% if r.mapping_type == 'bundle' %}<span class="badge badge-warn">BUNDLE</span>
+          {% else %}<span class="badge badge-off">simple</span>{% endif %}
+        </td>
+        <td>
+          {% if r.is_active %}<span class="badge badge-ok">ON</span>
+          {% else %}<span class="badge badge-off">OFF</span>{% endif %}
+        </td>
+        <td>
+          <a href="/admin/config/products/{{ r.id }}" class="btn btn-ghost btn-sm">Edit</a>
+          <form method="POST" action="/admin/config/products/{{ r.id }}/delete"
+                style="display:inline" onsubmit="return confirm('Delete mapping #{{ r.id }}?')">
+            <button class="btn btn-danger btn-sm">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-icon">🔗</div>
+    <div>Chưa có mapping nào. Bấm "+ Add" để thêm.</div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

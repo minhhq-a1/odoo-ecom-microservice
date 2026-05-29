@@ -1,0 +1,58 @@
+{% extends "admin/base.html" %}
+{% set active = "platforms" %}
+{% block title %}Platforms{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div class="page-title">🔌 Platform Configurations</div>
+  <div class="page-desc">Bật/tắt sàn, chọn dry-run, price master</div>
+</div>
+
+{% if flash %}<div class="alert alert-success">{{ flash }}</div>{% endif %}
+
+<div style="margin-bottom:16px">
+  <a href="/admin/config/platforms/new" class="btn btn-primary">+ Add platform</a>
+</div>
+
+<div class="table-wrap">
+  {% if rows %}
+  <table>
+    <thead>
+      <tr><th>Platform</th><th>Shop ID</th><th>Active</th><th>Dry-run</th>
+          <th>Price Master</th><th>Updated</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td><strong>{{ r.platform }}</strong></td>
+        <td class="mono">{{ r.shop_id or '—' }}</td>
+        <td>
+          {% if r.is_active %}<span class="badge badge-ok">ON</span>
+          {% else %}<span class="badge badge-off">OFF</span>{% endif %}
+        </td>
+        <td>
+          {% if r.dry_run %}<span class="badge badge-warn">DRY-RUN</span>
+          {% else %}<span class="badge badge-ok">LIVE</span>{% endif %}
+        </td>
+        <td>{{ r.price_master }}</td>
+        <td style="color:var(--muted);font-size:12px">
+          {{ r.updated_at.strftime('%d/%m %H:%M') if r.updated_at else '—' }}
+        </td>
+        <td>
+          <a href="/admin/config/platforms/{{ r.platform }}" class="btn btn-ghost btn-sm">Edit</a>
+          <form method="POST" action="/admin/config/platforms/{{ r.platform }}/delete"
+                style="display:inline" onsubmit="return confirm('Delete {{ r.platform }}?')">
+            <button class="btn btn-danger btn-sm">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-icon">🔌</div>
+    <div>Chưa có platform nào. Bấm "Add platform" để thêm.</div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

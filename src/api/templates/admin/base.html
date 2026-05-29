@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="vi"><head><meta charset="UTF-8">
+<title>{% block title %}Admin{% endblock %} — Middleware</title>
+<style>
+:root{--bg:#0f172a;--surface:#1e293b;--border:#334155;--accent:#38bdf8;
+--success:#4ade80;--danger:#f87171;--text:#e2e8f0;--muted:#94a3b8;--font:system-ui,sans-serif}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px}
+.layout{display:flex;min-height:100vh}
+.sidebar{width:220px;background:var(--surface);padding:20px;border-right:1px solid var(--border)}
+.main{flex:1;padding:32px;overflow-x:auto}
+.nav-item{display:block;padding:8px 12px;color:var(--muted);text-decoration:none;border-radius:6px}
+.nav-item.active{color:var(--text);background:rgba(255,255,255,.05)}
+.page-title{font-size:20px;font-weight:700;margin-bottom:8px}
+.page-desc{color:var(--muted);font-size:13px;margin-bottom:24px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:28px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px}
+.stat-card.danger{border-color:var(--danger)}
+.stat-card.success{border-color:var(--success)}
+.stat-val{font-size:28px;font-weight:800}
+.stat-label{font-size:11px;color:var(--muted);margin-top:6px;text-transform:uppercase}
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.table-header{padding:16px 20px;border-bottom:1px solid var(--border)}
+.table-title{font-weight:600}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px 16px;text-align:left;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04)}
+th{color:var(--muted);text-transform:uppercase;font-size:11px;background:rgba(0,0,0,.2)}
+.mono{font-family:monospace;font-size:12px}
+.btn{padding:6px 12px;border-radius:6px;border:none;cursor:pointer;font-size:12px;text-decoration:none;display:inline-block}
+.btn-ghost{background:rgba(255,255,255,.06);color:var(--text);border:1px solid var(--border)}
+.btn-primary{background:var(--accent);color:#0f172a;font-weight:600}
+.btn-danger{background:rgba(248,113,113,.15);color:var(--danger);border:1px solid rgba(248,113,113,.3)}
+.btn-sm{padding:4px 10px;font-size:11px}
+.form-group{margin-bottom:16px}
+.form-label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+.form-control{width:100%;padding:8px 12px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;font-size:13px;font-family:inherit}
+.form-control:focus{outline:none;border-color:var(--accent)}
+.form-hint{font-size:11px;color:var(--muted);margin-top:4px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.alert{padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:13px}
+.alert-success{background:rgba(74,222,128,.1);border:1px solid var(--success);color:var(--success)}
+.alert-danger{background:rgba(248,113,113,.1);border:1px solid var(--danger);color:var(--danger)}
+.alert-warning{background:rgba(251,191,36,.1);border:1px solid #fbbf24;color:#fbbf24}
+.toggle{display:inline-flex;align-items:center;gap:8px}
+.badge{padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.badge-ok{background:rgba(74,222,128,.15);color:var(--success)}
+.badge-off{background:rgba(148,163,184,.15);color:var(--muted)}
+.badge-warn{background:rgba(251,191,36,.15);color:#fbbf24}
+.code{font-family:monospace;font-size:11px;background:rgba(0,0,0,.3);padding:2px 6px;border-radius:4px;word-break:break-all}
+.empty-state{text-align:center;padding:48px;color:var(--muted)}
+.empty-icon{font-size:36px;margin-bottom:12px}
+</style></head><body>
+<div class="layout">
+  <nav class="sidebar">
+    <div style="font-weight:700;color:var(--accent);margin-bottom:24px">⚡ MIDDLEWARE</div>
+    <a href="/admin/" class="nav-item {% if active=='dashboard' %}active{% endif %}">📊 Dashboard</a>
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:16px 12px 6px">Config</div>
+    <a href="/admin/config/platforms" class="nav-item {% if active=='platforms' %}active{% endif %}">🔌 Platforms</a>
+    <a href="/admin/config/shopee" class="nav-item {% if active=='shopee_setup' %}active{% endif %}">🛒 Shopee Setup</a>
+    <a href="/admin/config/products" class="nav-item {% if active=='products' %}active{% endif %}">🔗 Product Mapping</a>
+    <a href="/admin/config/stock" class="nav-item {% if active=='stock_config' %}active{% endif %}">📦 Stock Allocation</a>
+  </nav>
+  <main class="main">{% block content %}{% endblock %}</main>
+</div>
+<script>
+if (document.querySelector('[data-autorefresh]')) setTimeout(()=>location.reload(),30000);
+</script>
+</body></html>
