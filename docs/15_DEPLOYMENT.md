@@ -105,7 +105,7 @@ ENV PATH=/home/appuser/.local/bin:$PATH
 ENV PYTHONUNBUFFERED=1
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD python -c "import httpx; httpx.get('http://localhost:8000/health/ready', timeout=3)"
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready', timeout=3)"
 
 EXPOSE 8000
 CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
@@ -121,13 +121,13 @@ services:
     image: ${REGISTRY}/middleware-api:${VERSION}
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8000"  # Let Docker assign random host port for scaling
     env_file: .env.prod
     depends_on:
       - redis
       - pgbouncer
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/ready"]
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health/ready', timeout=3)"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -204,18 +204,18 @@ services:
       DEFAULT_POOL_SIZE: 25
       RESERVE_POOL_SIZE: 5
     ports:
-      - "6432:5432"
+      - "127.0.0.1:6432:5432"  # Bind to localhost only
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy noeviction --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis-data:/data
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"  # Bind to localhost only
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "--pass", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 3s
       retries: 3
@@ -409,15 +409,28 @@ docker-compose -f docker-compose.green.yml up -d
 **2. Run Database Migrations:**
 
 ```bash
-# Connect to green API container
-docker exec -it green-api-1 bash
+# IMPORTANT: Run migrations BEFORE deploying green stack
+# This ensures backwards compatibility with blue stack during transition
 
-# Run migrations (idempotent)
+# Connect to any API container (blue or standalone migration container)
+docker exec -it blue-api-1 bash
+
+# Run migrations (must be backwards-compatible with current code)
 alembic upgrade head
 
 # Verify migration
 alembic current
+
+# Test that blue stack still works with new schema
+curl -f http://blue-api:8000/health/ready
 ```
+
+**Migration Safety Rules:**
+- ✅ **Safe:** Add new tables, add nullable columns, add indexes
+- ✅ **Safe:** Rename columns using views/aliases for backwards compatibility
+- ⚠️ **Requires coordination:** Drop columns (deploy code first, then drop)
+- ⚠️ **Requires coordination:** Rename tables (use views during transition)
+- ❌ **Unsafe:** Change column types, add NOT NULL constraints without defaults
 
 **3. Smoke Test Green Stack:**
 
