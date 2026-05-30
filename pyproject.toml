@@ -70,6 +70,8 @@ filterwarnings = [
     "error",
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",
+    "ignore::ResourceWarning:redis.asyncio.connection",
+    "ignore::pytest.PytestUnraisableExceptionWarning",
 ]
 addopts = "-ra --strict-markers --strict-config"
 
