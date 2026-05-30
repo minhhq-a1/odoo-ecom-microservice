@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 from typing import TYPE_CHECKING
 
@@ -38,6 +39,19 @@ async def redis() -> AsyncIterator[FakeRedis]:
     r = FakeRedis(decode_responses=True)
     yield r
     await r.flushall()
+    await r.aclose()
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def cleanup_redis_singleton() -> AsyncIterator[None]:
+    """Cleanup Redis singleton after each test to prevent connection leaks."""
+    yield
+    import src.core.redis
+
+    if src.core.redis._redis is not None:
+        with contextlib.suppress(Exception):
+            await src.core.redis._redis.aclose()
+        src.core.redis._redis = None
 
 
 @pytest.fixture
