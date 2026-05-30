@@ -35,6 +35,7 @@ async def test_get_by_platform_sku_cache_miss(redis: AsyncMock) -> None:
     """Cache miss should query DB and cache result."""
     redis.get = AsyncMock(return_value=None)
     redis.setex = AsyncMock()
+    redis.aclose = AsyncMock()
 
     mock_mapping = MagicMock()
     mock_mapping.id = 1
@@ -67,6 +68,7 @@ async def test_get_by_platform_sku_cache_miss(redis: AsyncMock) -> None:
 async def test_get_by_platform_sku_not_found(redis: AsyncMock) -> None:
     """Not found should return None."""
     redis.get = AsyncMock(return_value=None)
+    redis.aclose = AsyncMock()
 
     with (
         patch("src.services.mapping_service.get_redis", return_value=redis),
@@ -141,6 +143,7 @@ async def test_get_bundle_components_cache_miss(redis: AsyncMock) -> None:
     """Cache miss should query DB and cache components."""
     redis.get = AsyncMock(return_value=None)
     redis.setex = AsyncMock()
+    redis.aclose = AsyncMock()
 
     mock_comp1 = MagicMock()
     mock_comp1.odoo_sku = "COMP-A"
