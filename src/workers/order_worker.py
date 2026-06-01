@@ -25,6 +25,56 @@ from src.workers.retry_policy import (
 logger = get_logger(__name__)
 
 
+async def _process_logistics_event(
+    outbox_id: int,
+    platform: str,
+    platform_order_id: str | None,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    if not platform_order_id:
+        logger.warning("logistics_event_no_order_id", outbox_id=outbox_id)
+        return {"status": "logistics_event_no_order_id"}
+
+    data = payload.get("data", {}) or {}
+    tracking_number = (
+        payload.get("tracking_number")
+        or data.get("tracking_number")
+        or data.get("tracking_no")
+        or data.get("tracking_number_list", [None])[0]
+    )
+    if not tracking_number:
+        logger.info(
+            "logistics_event_no_tracking",
+            outbox_id=outbox_id,
+            platform_order_id=platform_order_id,
+        )
+        return {"status": "logistics_event_no_tracking"}
+
+    from src.odoo.client import OdooClient
+
+    updated = await OdooClient().update_order_tracking(
+        platform,
+        platform_order_id,
+        str(tracking_number),
+    )
+    if not updated:
+        logger.warning(
+            "logistics_event_order_not_found",
+            platform=platform,
+            platform_order_id=platform_order_id,
+            outbox_id=outbox_id,
+        )
+        return {"status": "order_not_found"}
+
+    logger.info(
+        "tracking_number_updated",
+        platform=platform,
+        platform_order_id=platform_order_id,
+        tracking_number=tracking_number,
+    )
+    return {"status": "tracking_updated", "tracking_number": str(tracking_number)}
+
+
 @shared_task(name="workers.process_webhook_event", bind=True, max_retries=MAX_RETRIES)
 def process_webhook_event(
     self,
@@ -57,7 +107,7 @@ def process_webhook_event(
         if event_type == "stock":
             return {"status": "stock_event_ignored"}
         if event_type == "logistics":
-            return {"status": "logistics_event_handled"}
+            return await _process_logistics_event(outbox_id, platform, platform_order_id, payload)
         return {"status": "no_handler"}
 
     try:

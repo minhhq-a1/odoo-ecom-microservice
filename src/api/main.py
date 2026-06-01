@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.openapi.docs import get_swagger_ui_html
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
@@ -64,7 +65,7 @@ if settings.ENVIRONMENT != "production":
 
 
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, limiter.handle_rate_limit_exceeded)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(BodySizeLimitMiddleware)
 app.add_middleware(TraceMiddleware)

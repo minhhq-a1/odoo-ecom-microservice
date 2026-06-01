@@ -33,7 +33,7 @@ _ORDER_DETAIL_FIELDS = (
     "buyer_user_id,buyer_username,estimated_shipping_fee,"
     "recipient_address,actual_shipping_fee,item_list,pay_time,"
     "dropshipper,dropshipper_phone,invoice_data,"
-    "order_status,update_time"
+    "order_status,update_time,package_list"
 )
 
 
