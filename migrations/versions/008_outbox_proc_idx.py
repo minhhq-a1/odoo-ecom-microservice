@@ -1,6 +1,6 @@
 """Extend idx_outbox_pending to cover 'processing' rows.
 
-Revision ID: 008_outbox_pending_index_processing
+Revision ID: 008_outbox_proc_idx
 Revises: 007_webhook_signature_index
 
 P1 (review): the outbox publisher now commits a "processing" claim before
@@ -10,7 +10,7 @@ scan must include 'processing' alongside 'pending'/'failed'.
 """
 from alembic import op
 
-revision = "008_outbox_pending_index_processing"
+revision = "008_outbox_proc_idx"
 down_revision = "007_webhook_signature_index"
 branch_labels = None
 depends_on = None
