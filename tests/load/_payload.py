@@ -12,7 +12,10 @@ import uuid
 
 
 def sign(body: bytes, partner_key: str) -> str:
-    return hmac.new(partner_key.encode(), body, hashlib.sha256).hexdigest()
+    # Shopee v2 push base string = push_url + raw_body. LOAD_WEBHOOK_URL must
+    # match the SHOPEE_WEBHOOK_URL the target middleware verifies against.
+    url = os.environ.get("LOAD_WEBHOOK_URL", "")
+    return hmac.new(partner_key.encode(), url.encode() + body, hashlib.sha256).hexdigest()
 
 
 def make_order_payload(order_sn: str | None = None) -> tuple[bytes, str]:

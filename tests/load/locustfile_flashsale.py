@@ -24,6 +24,6 @@ class BurstUser(HttpUser):
         self.client.post(
             "/webhook/shopee",
             data=body,
-            headers={"X-Shopee-Signature": sig, "Content-Type": "application/json"},
+            headers={"Authorization": sig, "Content-Type": "application/json"},
             name="POST /webhook/shopee [burst]",
         )

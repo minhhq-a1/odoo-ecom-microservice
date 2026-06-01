@@ -3,16 +3,12 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 
 from src.core.database import get_async_db_context
 from src.core.logging import get_logger
 from src.models.outbox import WebhookOutbox
-
-if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = get_logger(__name__)
 
@@ -34,11 +30,20 @@ QUEUE_MAP: dict[tuple[str, str], str] = {
 
 RETRY_DELAYS_SEC = (60, 300, 1800, 7200, 14400)
 
+# Lease applied when a row is claimed (status="processing"). The broker
+# dispatch happens AFTER the claim commits, so a crash between commit and
+# send would otherwise leave the row stuck in "processing". relay_pending
+# reclaims any "processing" row whose lease has expired (process_after<=now).
+PROCESSING_LEASE_SEC = 300
+
 
 class OutboxService:
     @classmethod
     async def try_publish_immediately(cls, outbox_id: int) -> bool:
         dead_letter_ids: list[int] = []
+        dispatch: dict | None = None
+        # Claim phase: lock the row, transition it to "processing", commit.
+        # The broker send is intentionally NOT done here — see _dispatch.
         async with get_async_db_context() as db:
             stmt = (
                 select(WebhookOutbox)
@@ -51,12 +56,18 @@ class OutboxService:
             entry = (await db.execute(stmt)).scalar_one_or_none()
             if entry is None:
                 return False
-            entry.status = "processing"
-            await db.flush()
-            ok = await cls._publish_entry(db, entry)
-            if not ok and entry.status == "dead_letter":
+            dispatch = cls._prepare_publish(entry)
+            if dispatch is None and entry.status == "dead_letter":
                 dead_letter_ids.append(entry.id)
             await db.commit()
+
+        # Dispatch phase: send to the broker only after the claim is durable,
+        # then record the outcome in a fresh transaction.
+        ok = False
+        if dispatch is not None:
+            ok, dl_id = await cls._dispatch(dispatch)
+            if dl_id is not None:
+                dead_letter_ids.append(dl_id)
         await cls._fire_dead_letter_alerts(dead_letter_ids)
         return ok
 
@@ -64,12 +75,18 @@ class OutboxService:
     async def relay_pending(cls, batch_size: int = 100) -> dict[str, int]:
         stats = {"published": 0, "failed": 0, "skipped": 0, "scanned": 0}
         dead_letter_ids: list[int] = []
+        dispatches: list[dict] = []
+        # Claim phase: lock + transition the batch to "processing" and commit.
+        # "processing" rows whose lease (process_after) has expired are
+        # reclaimed here too, recovering any send that crashed mid-flight.
+        # No broker I/O while the row locks are held — fixes the prior P3
+        # where send_task ran for every row inside one long transaction.
         async with get_async_db_context() as db:
             now = datetime.now(UTC)
             stmt = (
                 select(WebhookOutbox)
                 .where(
-                    WebhookOutbox.status.in_(["pending", "failed"]),
+                    WebhookOutbox.status.in_(["pending", "failed", "processing"]),
                     WebhookOutbox.process_after <= now,
                     WebhookOutbox.retry_count < WebhookOutbox.max_retries,
                 )
@@ -80,18 +97,24 @@ class OutboxService:
             result = await db.execute(stmt)
             entries = result.scalars().all()
             stats["scanned"] = len(entries)
-
             for entry in entries:
-                entry.status = "processing"
-                await db.flush()
-                ok = await cls._publish_entry(db, entry)
-                if ok:
-                    stats["published"] += 1
-                else:
-                    stats["failed"] += 1
+                dispatch = cls._prepare_publish(entry)
+                if dispatch is None:
                     if entry.status == "dead_letter":
                         dead_letter_ids.append(entry.id)
+                else:
+                    dispatches.append(dispatch)
             await db.commit()
+
+        # Dispatch phase: send each claimed row to the broker after commit.
+        for dispatch in dispatches:
+            ok, dl_id = await cls._dispatch(dispatch)
+            if ok:
+                stats["published"] += 1
+            else:
+                stats["failed"] += 1
+                if dl_id is not None:
+                    dead_letter_ids.append(dl_id)
         await cls._fire_dead_letter_alerts(dead_letter_ids)
         logger.info("outbox_relay_completed", **stats)
         return stats
@@ -120,49 +143,96 @@ class OutboxService:
             return {row[0]: row[1] for row in result.all()}
 
     @classmethod
-    async def _publish_entry(cls, db: AsyncSession, entry: WebhookOutbox) -> bool:
+    def _prepare_publish(cls, entry: WebhookOutbox) -> dict | None:
+        """Claim a row for publishing (called inside the locking transaction).
+
+        Marks it dead_letter and returns None if there is no queue mapping;
+        otherwise transitions it to "processing" with a fresh lease and
+        returns the dispatch descriptor used after commit. Does NOT touch the
+        broker — that is deferred to `_dispatch` so the send never runs inside
+        an open transaction that could later roll back.
+        """
         queue = QUEUE_MAP.get((entry.platform, entry.event_type))
         if queue is None:
             entry.status = "dead_letter"
             entry.last_error = f"No queue mapping for {entry.platform}/{entry.event_type}"
-            return False
+            return None
 
+        entry.status = "processing"
+        entry.process_after = datetime.now(UTC) + timedelta(seconds=PROCESSING_LEASE_SEC)
+        return {
+            "outbox_id": entry.id,
+            "queue": queue,
+            "kwargs": {
+                "outbox_id": entry.id,
+                "platform": entry.platform,
+                "event_type": entry.event_type,
+                "platform_order_id": entry.platform_order_id,
+                "payload": entry.payload,
+            },
+        }
+
+    @classmethod
+    async def _dispatch(cls, dispatch: dict) -> tuple[bool, int | None]:
+        """Send a claimed row to the broker (AFTER its claim has committed),
+        then record the outcome in a fresh transaction.
+
+        Returns (ok, dead_letter_id). A worst-case duplicate send is harmless:
+        the task_id `outbox-{id}` lets the broker dedupe and the consumer is
+        idempotent (advisory lock + x_platform_order_id UNIQUE).
+        """
+        outbox_id = dispatch["outbox_id"]
         try:
             from src.workers.app import celery_app
 
             celery_app.send_task(
                 "workers.process_webhook_event",
-                kwargs={
-                    "outbox_id": entry.id,
-                    "platform": entry.platform,
-                    "event_type": entry.event_type,
-                    "platform_order_id": entry.platform_order_id,
-                    "payload": entry.payload,
-                },
-                queue=queue,
-                task_id=f"outbox-{entry.id}",
+                kwargs=dispatch["kwargs"],
+                queue=dispatch["queue"],
+                task_id=f"outbox-{outbox_id}",
             )
+        except Exception as e:
+            return False, await cls._record_failure(outbox_id, str(e))
+
+        await cls._record_published(outbox_id, dispatch["queue"])
+        return True, None
+
+    @classmethod
+    async def _record_published(cls, outbox_id: int, queue: str) -> None:
+        async with get_async_db_context() as db:
+            entry = await db.get(WebhookOutbox, outbox_id)
+            if entry is None:
+                return
             entry.status = "published"
             entry.published_at = datetime.now(UTC)
-            logger.info("outbox_published", outbox_id=entry.id, queue=queue)
-            return True
-        except Exception as e:
+            await db.commit()
+        logger.info("outbox_published", outbox_id=outbox_id, queue=queue)
+
+    @classmethod
+    async def _record_failure(cls, outbox_id: int, error: str) -> int | None:
+        """Record a failed dispatch. Returns the id if it was dead-lettered."""
+        async with get_async_db_context() as db:
+            entry = await db.get(WebhookOutbox, outbox_id)
+            if entry is None:
+                return None
             entry.retry_count += 1
-            entry.last_error = str(e)
+            entry.last_error = error
             if entry.retry_count >= entry.max_retries:
                 entry.status = "dead_letter"
-                logger.exception("outbox_dead_letter", outbox_id=entry.id, error=str(e))
-            else:
-                entry.status = "failed"
-                delay = RETRY_DELAYS_SEC[min(entry.retry_count - 1, len(RETRY_DELAYS_SEC) - 1)]
-                entry.process_after = datetime.now(UTC) + timedelta(seconds=delay)
-                logger.warning(
-                    "outbox_retry_scheduled",
-                    outbox_id=entry.id,
-                    retry_count=entry.retry_count,
-                    delay_sec=delay,
-                )
-            return False
+                logger.error("outbox_dead_letter", outbox_id=outbox_id, error=error)
+                await db.commit()
+                return outbox_id
+            entry.status = "failed"
+            delay = RETRY_DELAYS_SEC[min(entry.retry_count - 1, len(RETRY_DELAYS_SEC) - 1)]
+            entry.process_after = datetime.now(UTC) + timedelta(seconds=delay)
+            logger.warning(
+                "outbox_retry_scheduled",
+                outbox_id=outbox_id,
+                retry_count=entry.retry_count,
+                delay_sec=delay,
+            )
+            await db.commit()
+            return None
 
     @classmethod
     async def _fire_dead_letter_alerts(cls, outbox_ids: list[int]) -> None:

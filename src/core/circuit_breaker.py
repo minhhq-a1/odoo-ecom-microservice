@@ -1,4 +1,12 @@
-"""Async circuit breaker. Persists summary state in Redis. Prometheus instrumented."""
+"""Async circuit breaker — PER-PROCESS, in-memory state.
+
+State (CLOSED/OPEN/HALF_OPEN) lives in this worker process only; it is NOT
+shared via Redis or any other store. Each Uvicorn/Celery worker keeps its own
+breaker, so OPEN does not coordinate across the fleet. Size thresholds with
+that in mind: the cluster-wide failure rate that trips protection is roughly
+`failure_threshold x (number of worker processes)`. If cross-worker
+coordination is ever required, back the state with Redis under `_lock`.
+"""
 
 from __future__ import annotations
 
@@ -106,16 +114,21 @@ class CircuitBreaker:
         logger.info("circuit_closed", service=self.service)
 
 
+# Thresholds are PER PROCESS (see module docstring). Workers run
+# --concurrency=8 across several containers plus the API processes, so the
+# cluster-wide trip point is ~threshold x that process count. Kept low so a
+# genuinely-down dependency is abandoned quickly per process instead of each
+# process burning `threshold` calls against it.
 odoo_breaker = CircuitBreaker(
     service="odoo",
-    failure_threshold=5,
+    failure_threshold=3,
     rolling_window_seconds=60,
     open_timeout_seconds=60,
 )
 
 shopee_breaker = CircuitBreaker(
     service="shopee",
-    failure_threshold=10,
+    failure_threshold=5,
     rolling_window_seconds=60,
     open_timeout_seconds=30,
 )

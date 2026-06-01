@@ -13,6 +13,7 @@ from sqlalchemy import (
     String,
     Text,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import INET, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -46,4 +47,13 @@ class WebhookEventLog(Base):
     )
     parse_error: Mapped[str | None] = mapped_column(Text)
 
-    __table_args__ = (Index("idx_webhook_event_platform_order", "platform", "platform_order_id"),)
+    __table_args__ = (
+        Index("idx_webhook_event_platform_order", "platform", "platform_order_id"),
+        # Partial index backing the Redis-down replay fallback lookup in
+        # webhooks._is_replay (signature + signature_valid filter).
+        Index(
+            "idx_webhook_event_signature_valid",
+            "signature",
+            postgresql_where=text("signature_valid"),
+        ),
+    )

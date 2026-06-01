@@ -17,12 +17,22 @@ def test_sign_request_deterministic() -> None:
 
 
 def test_verify_webhook_valid() -> None:
+    # Shopee v2 push signs HMAC(partner_key, push_url + raw_body).
+    url = "https://mw.example.com/webhook/shopee"
     body = b'{"code":3}'
-    _sig, _ = sign_request("", "", "secret_key", "", "", timestamp=0)
     import hashlib
     import hmac
 
-    expected = hmac.new(b"secret_key", body, hashlib.sha256).hexdigest()
-    assert verify_webhook(body, expected, "secret_key") is True
-    assert verify_webhook(body, "wrong", "secret_key") is False
-    assert verify_webhook(body, "", "secret_key") is False
+    expected = hmac.new(b"secret_key", url.encode() + body, hashlib.sha256).hexdigest()
+    assert verify_webhook(url, body, expected, "secret_key") is True
+    # body-only signature (old, wrong scheme) must be rejected
+    body_only = hmac.new(b"secret_key", body, hashlib.sha256).hexdigest()
+    assert verify_webhook(url, body, body_only, "secret_key") is False
+    # tampered URL must be rejected
+    assert (
+        verify_webhook("https://evil.example.com/webhook/shopee", body, expected, "secret_key")
+        is False
+    )
+    assert verify_webhook(url, body, "wrong", "secret_key") is False
+    assert verify_webhook(url, body, "", "secret_key") is False
+    assert verify_webhook("", body, expected, "secret_key") is False

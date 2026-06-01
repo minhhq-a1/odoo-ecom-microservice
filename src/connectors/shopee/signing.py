@@ -42,8 +42,17 @@ def sign_public(
     return digest, ts
 
 
-def verify_webhook(body: bytes, signature: str, partner_key: str) -> bool:
-    if not signature:
+def verify_webhook(url: str, body: bytes, signature: str, partner_key: str) -> bool:
+    """Verify a Shopee v2 push (webhook) signature.
+
+    Shopee signs each push as HMAC-SHA256(partner_key, push_url + raw_body)
+    (hex) and delivers it in the `Authorization` header. The base string is
+    the EXACT registered callback URL concatenated with the raw request body
+    bytes — re-serialized JSON will not match. `url` must be the registered
+    push URL (settings.SHOPEE_WEBHOOK_URL), not a proxy-rewritten request URL.
+    """
+    if not signature or not url:
         return False
-    expected = hmac.new(partner_key.encode("utf-8"), body, hashlib.sha256).hexdigest()
+    base = url.encode("utf-8") + body
+    expected = hmac.new(partner_key.encode("utf-8"), base, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)

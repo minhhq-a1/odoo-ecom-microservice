@@ -24,7 +24,7 @@ class WebhookUser(HttpUser):
         with self.client.post(
             "/webhook/shopee",
             data=body,
-            headers={"X-Shopee-Signature": sig, "Content-Type": "application/json"},
+            headers={"Authorization": sig, "Content-Type": "application/json"},
             catch_response=True,
             name="POST /webhook/shopee [order]",
         ) as resp:
@@ -39,7 +39,7 @@ class WebhookUser(HttpUser):
         with self.client.post(
             "/webhook/shopee",
             data=body,
-            headers={"X-Shopee-Signature": sig, "Content-Type": "application/json"},
+            headers={"Authorization": sig, "Content-Type": "application/json"},
             catch_response=True,
             name="POST /webhook/shopee [logistics]",
         ) as resp:
