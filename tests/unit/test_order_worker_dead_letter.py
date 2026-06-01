@@ -158,3 +158,47 @@ def test_product_not_found_alert_failure_preserves_dead_letter_return(monkeypatc
     assert outbox_row.status == "dead_letter"
     assert mapping_row.status == "dead_letter"
     assert fake_db.committed == 1
+
+
+def test_logistics_event_updates_odoo_tracking(monkeypatch):
+    odoo = MagicMock()
+    odoo.update_order_tracking = AsyncMock(return_value=True)
+    odoo_cls = MagicMock(return_value=odoo)
+    monkeypatch.setattr("src.odoo.client.OdooClient", odoo_cls)
+
+    from src.workers.order_worker import process_webhook_event
+
+    result = process_webhook_event.apply(
+        kwargs={
+            "outbox_id": 44,
+            "platform": "shopee",
+            "event_type": "logistics",
+            "platform_order_id": "ORD-3",
+            "payload": {"data": {"tracking_number": "SPXVN003"}},
+        },
+    ).get()
+
+    assert result == {"status": "tracking_updated", "tracking_number": "SPXVN003"}
+    odoo.update_order_tracking.assert_awaited_once_with("shopee", "ORD-3", "SPXVN003")
+
+
+def test_logistics_event_missing_order_returns_not_found(monkeypatch):
+    odoo = MagicMock()
+    odoo.update_order_tracking = AsyncMock(return_value=False)
+    odoo_cls = MagicMock(return_value=odoo)
+    monkeypatch.setattr("src.odoo.client.OdooClient", odoo_cls)
+
+    from src.workers.order_worker import process_webhook_event
+
+    result = process_webhook_event.apply(
+        kwargs={
+            "outbox_id": 45,
+            "platform": "shopee",
+            "event_type": "logistics",
+            "platform_order_id": "ORD-404",
+            "payload": {"tracking_number": "SPXVN404"},
+        },
+    ).get()
+
+    assert result == {"status": "order_not_found"}
+    odoo.update_order_tracking.assert_awaited_once_with("shopee", "ORD-404", "SPXVN404")

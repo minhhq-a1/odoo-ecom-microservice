@@ -11,19 +11,33 @@ from src.workers._async_helper import run_async
 logger = get_logger(__name__)
 
 
+async def _load_syncable_price(sku: str, platform: str) -> tuple[dict, float | None]:
+    from src.odoo.client import OdooClient
+
+    product = await OdooClient().get_product_marketplace_controls(sku)
+    if not product:
+        return {"status": "product_not_found", "sku": sku}, None
+    if product.get("x_block_marketplace_sync"):
+        logger.info("price_sync_blocked_by_product", sku=sku, platform=platform)
+        return {"status": "blocked", "sku": sku}, None
+
+    price = float(product.get("lst_price") or 0.0)
+    if price <= 0:
+        logger.warning("price_sync_skip_zero_price", sku=sku, price=price)
+        return {"status": "skipped_zero_price", "sku": sku}, None
+    return {}, price
+
+
 @shared_task(name="workers.sync_price_for_sku", bind=True, max_retries=3)
 def sync_price_for_sku(self, sku: str, platform: str = "shopee") -> dict:
     async def _run() -> dict:
         if not settings.ENABLE_PRICE_SYNC:
             return {"status": "disabled"}
-        from src.odoo.client import OdooClient
         from src.services.mapping_service import MappingService
 
-        odoo = OdooClient()
-        price = await odoo.get_product_price(sku)
-        if price <= 0:
-            logger.warning("price_sync_skip_zero_price", sku=sku, price=price)
-            return {"status": "skipped_zero_price", "sku": sku}
+        early_result, price = await _load_syncable_price(sku, platform)
+        if price is None:
+            return early_result
 
         if settings.MIDDLEWARE_DRY_RUN:
             return {"status": "dry_run", "sku": sku, "price": price}

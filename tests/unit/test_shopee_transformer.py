@@ -37,6 +37,8 @@ def test_transform_basic(shopee_order_detail_raw: dict) -> None:
     assert order.items[0].discounted_price == Decimal("87500")
     assert order.total_amount == Decimal("200000")
     assert order.shipping_address.phone == "0901234567"
+    assert order.logistics is not None
+    assert order.logistics.tracking_number == "SPXVN001"
 
 
 def test_transform_phone_normalize() -> None:

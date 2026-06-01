@@ -155,6 +155,29 @@ class OdooClient:
         )
         return result[0]["id"] if result else None
 
+    async def update_order_tracking(
+        self,
+        platform: str,
+        platform_order_id: str,
+        tracking_number: str,
+    ) -> bool:
+        result = await self.search_read(
+            "sale.order",
+            [["x_platform", "=", platform], ["x_platform_order_id", "=", platform_order_id]],
+            ["id", "x_tracking_number"],
+            limit=1,
+        )
+        if not result:
+            return False
+        order_id = result[0]["id"]
+        if result[0].get("x_tracking_number") == tracking_number:
+            return True
+        return await self.write(
+            "sale.order",
+            [order_id],
+            {"x_tracking_number": tracking_number},
+        )
+
     async def get_product_id_by_sku(self, sku: str) -> int | None:
         result = await self.search_read(
             "product.product",
@@ -174,6 +197,24 @@ class OdooClient:
         if not result:
             return 0
         return int(result[0]["virtual_available"] or 0)
+
+    async def get_product_marketplace_controls(
+        self,
+        sku: str,
+    ) -> dict[str, Any] | None:
+        result = await self.search_read(
+            "product.product",
+            [["default_code", "=", sku]],
+            [
+                "id",
+                "virtual_available",
+                "lst_price",
+                "x_marketplace_buffer_pct",
+                "x_block_marketplace_sync",
+            ],
+            limit=1,
+        )
+        return result[0] if result else None
 
     async def get_product_price(self, sku: str) -> float:
         result = await self.search_read(
@@ -214,11 +255,27 @@ class OdooClient:
         candidates = await self.search_read(
             "res.partner",
             [["phone", "=", phone]],
-            ["id", "name"],
+            ["id", "name", "x_platform_source", "x_platform_buyer_id"],
             limit=10,
         )
         for c in candidates:
             if fuzz.ratio((c["name"] or "").lower(), address.full_name.lower()) > 80:
+                # Backfill platform fields if not set
+                if not c.get("x_platform_source"):
+                    await self.write(
+                        "res.partner",
+                        [c["id"]],
+                        {
+                            "x_platform_source": platform,
+                            "x_platform_buyer_id": buyer_platform_id,
+                        },
+                    )
+                    logger.info(
+                        "partner_platform_fields_backfilled",
+                        partner_id=c["id"],
+                        platform=platform,
+                        buyer_id=buyer_platform_id,
+                    )
                 return c["id"]
 
         if candidates:
@@ -242,6 +299,8 @@ class OdooClient:
                 "city": address.district,
                 "comment": f"{address.ward or ''}, {address.district}, {address.province}",
                 "country_id": country_id,
+                "x_platform_source": platform,
+                "x_platform_buyer_id": buyer_platform_id,
             },
         )
 
