@@ -20,7 +20,21 @@ class StockService:
 
     async def calculate_platform_stock(self, odoo_sku: str, platform: str) -> int:
         """Apply buffer + allocation. Never returns negative."""
-        odoo_stock = await self.odoo.get_stock_quantity(odoo_sku)
+        product = await self.odoo.get_product_marketplace_controls(odoo_sku)
+        if not product:
+            logger.warning("product_not_found_for_stock", odoo_sku=odoo_sku, platform=platform)
+            return 0
+
+        if product.get("x_block_marketplace_sync"):
+            logger.info(
+                "product_sync_blocked",
+                odoo_sku=odoo_sku,
+                platform=platform,
+            )
+            return 0
+
+        odoo_stock = int(product.get("virtual_available") or 0)
+
         async with get_async_db_context() as db:
             cfg_result = await db.execute(
                 select(StockAllocationConfig).where(
@@ -31,7 +45,14 @@ class StockService:
             )
             cfg = cfg_result.scalar_one_or_none()
 
-        buffer_pct = float(cfg.buffer_pct) if cfg else float(settings.DEFAULT_STOCK_BUFFER_PCT)
+        product_buffer = product.get("x_marketplace_buffer_pct")
+        if product_buffer is not None and product_buffer is not False:
+            buffer_pct = float(product_buffer)
+        elif cfg:
+            buffer_pct = float(cfg.buffer_pct)
+        else:
+            buffer_pct = float(settings.DEFAULT_STOCK_BUFFER_PCT)
+
         allocation_pct = (
             float(cfg.allocation_pct) if cfg else float(settings.DEFAULT_SHOPEE_ALLOCATION_PCT)
         )

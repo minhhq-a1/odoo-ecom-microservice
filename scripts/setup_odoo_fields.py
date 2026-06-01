@@ -1,88 +1,24 @@
-"""Setup Odoo custom fields via XML-RPC."""
+"""
+⚠️  DEPRECATED: This script is outdated and incomplete.
 
-from __future__ import annotations
+Use the Odoo addon instead:
+  Location: ~/odoo-workspace/18.0/extra-addons/onnet-dc7-internal/addons/custom/a1_sale_ecom_middleware/
 
-import xmlrpc.client
+The addon provides:
+  - All sale.order fields (x_platform, x_platform_order_id, x_platform_order_sn, x_sync_status, x_tracking_number)
+  - res.partner fields (x_platform_source, x_platform_buyer_id)
+  - product.product fields (x_marketplace_buffer_pct, x_block_marketplace_sync)
+  - Views, ACLs, constraints, and audit logging
 
-from src.core.config import settings
+To install the addon:
+  1. Ensure the addon is in your Odoo addons path
+  2. Update the app list in Odoo
+  3. Install "A1 Sale E-Commerce Middleware" module
 
-FIELDS = [
-    {
-        "model": "sale.order",
-        "name": "x_platform",
-        "field_description": "E-Commerce Platform",
-        "ttype": "selection",
-        "selection": "[('shopee','Shopee'),('lazada','Lazada'),('tiktok','TikTok Shop')]",
-    },
-    {
-        "model": "sale.order",
-        "name": "x_platform_order_id",
-        "field_description": "Platform Order ID",
-        "ttype": "char",
-        "index": True,
-    },
-    {
-        "model": "sale.order",
-        "name": "x_platform_order_sn",
-        "field_description": "Platform Order SN",
-        "ttype": "char",
-    },
-    {
-        "model": "sale.order",
-        "name": "x_sync_status",
-        "field_description": "Sync Status",
-        "ttype": "selection",
-        "selection": "[('pending','Pending'),('synced','Synced'),('error','Error')]",
-    },
-    {
-        "model": "sale.order",
-        "name": "x_tracking_number",
-        "field_description": "Tracking Number",
-        "ttype": "char",
-    },
-]
+This script only creates 5 sale.order fields and lacks views, constraints, and other models.
+"""
 
+import sys
 
-def main() -> None:
-    common = xmlrpc.client.ServerProxy(f"{settings.ODOO_URL}/xmlrpc/2/common")
-    uid = common.authenticate(settings.ODOO_DB, settings.ODOO_USER, settings.ODOO_PASSWORD, {})
-    models = xmlrpc.client.ServerProxy(f"{settings.ODOO_URL}/xmlrpc/2/object")
-
-    for f in FIELDS:
-        model_id = models.execute_kw(
-            settings.ODOO_DB,
-            uid,
-            settings.ODOO_PASSWORD,
-            "ir.model",
-            "search",
-            [[["model", "=", f["model"]]]],
-        )
-        if not model_id:
-            print(f"Model {f['model']} not found")
-            continue
-
-        existing = models.execute_kw(
-            settings.ODOO_DB,
-            uid,
-            settings.ODOO_PASSWORD,
-            "ir.model.fields",
-            "search",
-            [[["name", "=", f["name"]], ["model", "=", f["model"]]]],
-        )
-        if existing:
-            print(f"Skip existing: {f['model']}.{f['name']}")
-            continue
-
-        models.execute_kw(
-            settings.ODOO_DB,
-            uid,
-            settings.ODOO_PASSWORD,
-            "ir.model.fields",
-            "create",
-            [{"model_id": model_id[0], **f}],
-        )
-        print(f"Created: {f['model']}.{f['name']}")
-
-
-if __name__ == "__main__":
-    main()
+print(__doc__)
+sys.exit(1)

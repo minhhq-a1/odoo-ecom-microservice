@@ -9,11 +9,26 @@ import pytest
 from src.services.stock_service import StockService
 
 
+def _product_controls(
+    stock: int,
+    *,
+    blocked: bool = False,
+    buffer_pct: float | bool = False,
+) -> dict:
+    return {
+        "virtual_available": stock,
+        "x_block_marketplace_sync": blocked,
+        "x_marketplace_buffer_pct": buffer_pct,
+    }
+
+
 @pytest.mark.asyncio
 async def test_calculate_platform_stock_default_config() -> None:
     """Calculate stock with default config should apply default buffer and allocation."""
     mock_odoo = AsyncMock()
-    mock_odoo.get_stock_quantity = AsyncMock(return_value=100)
+    mock_odoo.get_product_marketplace_controls = AsyncMock(
+        return_value=_product_controls(100),
+    )
 
     with (
         patch("src.services.stock_service.get_async_db_context") as mock_db_ctx,
@@ -40,7 +55,9 @@ async def test_calculate_platform_stock_default_config() -> None:
 async def test_calculate_platform_stock_custom_config() -> None:
     """Calculate stock with custom config should use configured percentages."""
     mock_odoo = AsyncMock()
-    mock_odoo.get_stock_quantity = AsyncMock(return_value=200)
+    mock_odoo.get_product_marketplace_controls = AsyncMock(
+        return_value=_product_controls(200),
+    )
 
     mock_config = MagicMock()
     mock_config.buffer_pct = 20.0
@@ -62,10 +79,55 @@ async def test_calculate_platform_stock_custom_config() -> None:
 
 
 @pytest.mark.asyncio
+async def test_calculate_platform_stock_uses_odoo_product_buffer_override() -> None:
+    """Odoo addon product buffer overrides local stock config buffer."""
+    mock_odoo = AsyncMock()
+    mock_odoo.get_product_marketplace_controls = AsyncMock(
+        return_value=_product_controls(200, buffer_pct=30.0),
+    )
+
+    mock_config = MagicMock()
+    mock_config.buffer_pct = 5.0
+    mock_config.allocation_pct = 50.0
+
+    with patch("src.services.stock_service.get_async_db_context") as mock_db_ctx:
+        mock_db = AsyncMock()
+        mock_result = AsyncMock()
+        mock_result.scalar_one_or_none = MagicMock(return_value=mock_config)
+        mock_db.execute = AsyncMock(return_value=mock_result)
+        mock_db_ctx.return_value.__aenter__ = AsyncMock(return_value=mock_db)
+        mock_db_ctx.return_value.__aexit__ = AsyncMock()
+
+        svc = StockService(odoo=mock_odoo)
+        result = await svc.calculate_platform_stock("SKU-001", "shopee")
+
+    # 200 * (1 - 0.3) * 0.5 = 70
+    assert result == 70
+
+
+@pytest.mark.asyncio
+async def test_calculate_platform_stock_blocked_by_odoo_product() -> None:
+    """Odoo addon block flag prevents marketplace stock publication."""
+    mock_odoo = AsyncMock()
+    mock_odoo.get_product_marketplace_controls = AsyncMock(
+        return_value=_product_controls(200, blocked=True),
+    )
+
+    with patch("src.services.stock_service.get_async_db_context") as mock_db_ctx:
+        svc = StockService(odoo=mock_odoo)
+        result = await svc.calculate_platform_stock("SKU-001", "shopee")
+
+    assert result == 0
+    mock_db_ctx.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_calculate_platform_stock_never_negative() -> None:
     """Calculate stock should never return negative values."""
     mock_odoo = AsyncMock()
-    mock_odoo.get_stock_quantity = AsyncMock(return_value=5)
+    mock_odoo.get_product_marketplace_controls = AsyncMock(
+        return_value=_product_controls(5),
+    )
 
     with (
         patch("src.services.stock_service.get_async_db_context") as mock_db_ctx,
@@ -92,7 +154,9 @@ async def test_calculate_platform_stock_never_negative() -> None:
 async def test_calculate_platform_stock_zero_odoo_stock() -> None:
     """Calculate stock with zero Odoo stock should return zero."""
     mock_odoo = AsyncMock()
-    mock_odoo.get_stock_quantity = AsyncMock(return_value=0)
+    mock_odoo.get_product_marketplace_controls = AsyncMock(
+        return_value=_product_controls(0),
+    )
 
     with patch("src.services.stock_service.get_async_db_context") as mock_db_ctx:
         mock_db = AsyncMock()
@@ -133,7 +197,9 @@ async def test_calculate_bundle_stock_simple_mapping() -> None:
     mock_mapping.odoo_sku = "SKU-001"
 
     mock_odoo = AsyncMock()
-    mock_odoo.get_stock_quantity = AsyncMock(return_value=100)
+    mock_odoo.get_product_marketplace_controls = AsyncMock(
+        return_value=_product_controls(100),
+    )
 
     with (
         patch("src.services.stock_service.get_async_db_context") as mock_db_ctx,
@@ -199,7 +265,12 @@ async def test_calculate_bundle_stock_min_component() -> None:
     # COMP-A: 100 allocated → 100 // 2 = 50 bundles
     # COMP-B: 30 allocated → 30 // 1 = 30 bundles
     # min(50, 30) = 30
-    mock_odoo.get_stock_quantity = AsyncMock(side_effect=[100, 30])
+    mock_odoo.get_product_marketplace_controls = AsyncMock(
+        side_effect=[
+            _product_controls(100),
+            _product_controls(30),
+        ],
+    )
 
     with (
         patch("src.services.stock_service.get_async_db_context") as mock_db_ctx,
@@ -244,7 +315,9 @@ async def test_calculate_bundle_stock_zero_quantity_component() -> None:
     mock_comp.quantity = 0  # Edge case
 
     mock_odoo = AsyncMock()
-    mock_odoo.get_stock_quantity = AsyncMock(return_value=100)
+    mock_odoo.get_product_marketplace_controls = AsyncMock(
+        return_value=_product_controls(100),
+    )
 
     with (
         patch("src.services.stock_service.get_async_db_context") as mock_db_ctx,
