@@ -172,6 +172,10 @@ class ShopeeConnector(BaseConnector):
         Update Shopee stock. Looks up item_id/model_id via ProductMapping.
         platform_sku_id format: "item_id" (simple) or "item_id:model_id" (variant).
         """
+        if settings.MIDDLEWARE_DRY_RUN:
+            logger.info("dry_run_update_stock_skipped", sku=request.sku, qty=request.quantity)
+            return
+
         from src.services.mapping_service import MappingService
 
         mapping = await MappingService.get_by_platform_sku("shopee", request.sku)
@@ -228,6 +232,10 @@ class ShopeeConnector(BaseConnector):
     async def update_price(self, platform_sku: str, price: float) -> None:
         """Push price to Shopee. `platform_sku` = "item_id" (simple) or
         "item_id:model_id" (variant), matching update_stock format."""
+        if settings.MIDDLEWARE_DRY_RUN:
+            logger.info("dry_run_update_price_skipped", platform_sku=platform_sku, price=price)
+            return
+
         try:
             item_id_raw, _, model_raw = platform_sku.partition(":")
             item_id = int(item_id_raw)
@@ -266,6 +274,13 @@ class ShopeeConnector(BaseConnector):
             raise
 
     async def confirm_shipment(self, platform_order_id: str, tracking_no: str) -> None:
+        if settings.MIDDLEWARE_DRY_RUN:
+            logger.info(
+                "dry_run_confirm_shipment_skipped",
+                order_sn=platform_order_id,
+                tracking_no=tracking_no,
+            )
+            return
         await self._request(
             "POST",
             "/api/v2/logistics/ship_order",

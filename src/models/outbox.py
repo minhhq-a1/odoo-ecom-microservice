@@ -46,7 +46,7 @@ class WebhookOutbox(Base):
             "idx_outbox_pending",
             "status",
             "process_after",
-            postgresql_where=text("status IN ('pending', 'failed')"),
+            postgresql_where=text("status IN ('pending', 'failed', 'processing')"),
         ),
         Index("idx_outbox_platform_order", "platform", "platform_order_id"),
     )

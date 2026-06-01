@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, Request
 from redis.exceptions import RedisError
+from sqlalchemy import select
 
 from src.api.dependencies import get_async_db
 from src.connectors.shopee.signing import verify_webhook
@@ -29,21 +30,34 @@ logger = get_logger(__name__)
 EVENT_TYPE_MAP: dict[int, str] = {3: "order", 4: "logistics", 15: "stock"}
 
 
-async def _is_replay(signature: str) -> bool:
-    """Returns True only if Redis already has this signature recorded as
-    successfully ingested. Uses GET (not SET nx) so a crash between
-    durable commit and the post-commit `_mark_processed` call still lets
-    Shopee's retry re-ingest the event — silent loss is worse than a
-    duplicate (outbox + order_mapping idempotency dedup downstream).
+async def _is_replay(signature: str, db: AsyncSession) -> bool:
+    """Returns True only if this signature was already ingested. Primary
+    path is the Redis nonce (fast, 5-minute window). Uses GET (not SET nx)
+    so a crash between durable commit and the post-commit `_mark_processed`
+    call still lets Shopee's retry re-ingest the event — silent loss is
+    worse than a duplicate (outbox + order_mapping idempotency dedup
+    downstream).
 
-    Redis failure → fail-open (treat as non-replay + log)."""
+    Redis failure → fail to the durable store: query webhook_event_log for
+    a prior successfully-verified row with this signature. A new legitimate
+    event has no such row (no loss), while a genuine replay is still caught
+    even when Redis is down. Closing the previous fail-open hole where an
+    attacker who disrupted Redis disabled replay protection entirely."""
+    nonce_key = f"webhook:nonce:shopee:{signature[:32]}"
     try:
         r = await get_redis()
-        nonce_key = f"webhook:nonce:shopee:{signature[:32]}"
         return await r.exists(nonce_key) == 1
     except RedisError as e:
-        logger.warning("nonce_check_redis_unavailable_failopen", error=str(e))
-        return False
+        logger.warning("nonce_check_redis_unavailable_db_fallback", error=str(e))
+        seen = await db.scalar(
+            select(WebhookEventLog.id)
+            .where(
+                WebhookEventLog.signature == signature,
+                WebhookEventLog.signature_valid.is_(True),
+            )
+            .limit(1),
+        )
+        return seen is not None
 
 
 async def _mark_processed(signature: str) -> None:
@@ -63,12 +77,21 @@ async def shopee_webhook(
     request: Request,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_async_db),
+    authorization: str | None = Header(default=None),
     x_shopee_signature: str | None = Header(default=None),
 ) -> dict[str, str]:
     body = await request.body()
-    sig_valid = verify_webhook(body, x_shopee_signature or "", settings.SHOPEE_PARTNER_KEY)
+    # Real Shopee v2 pushes deliver the HMAC in the Authorization header;
+    # X-Shopee-Signature kept as a transitional fallback for existing tooling.
+    x_shopee_signature = authorization or x_shopee_signature
+    sig_valid = verify_webhook(
+        settings.SHOPEE_WEBHOOK_URL,
+        body,
+        x_shopee_signature or "",
+        settings.SHOPEE_PARTNER_KEY,
+    )
 
-    if sig_valid and x_shopee_signature and await _is_replay(x_shopee_signature):
+    if sig_valid and x_shopee_signature and await _is_replay(x_shopee_signature, db):
         logger.warning("webhook_replay_detected", platform="shopee")
         return {"status": "ok", "replay": "true"}
 

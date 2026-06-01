@@ -138,12 +138,21 @@ class OdooClient:
         return await self._execute(model, "search_read", [domain], kw)
 
     async def create(self, model: str, values: dict) -> int:
+        if settings.MIDDLEWARE_DRY_RUN:
+            logger.info("dry_run_create_skipped", model=model)
+            return -1
         return await self._execute(model, "create", [values])
 
     async def write(self, model: str, ids: list[int], values: dict) -> bool:
+        if settings.MIDDLEWARE_DRY_RUN:
+            logger.info("dry_run_write_skipped", model=model, ids=ids, fields=list(values))
+            return True
         return await self._execute(model, "write", [ids, values])
 
     async def call_method(self, model: str, method: str, ids: list[int], **kwargs: Any) -> Any:
+        if settings.MIDDLEWARE_DRY_RUN:
+            logger.info("dry_run_call_method_skipped", model=model, method=method, ids=ids)
+            return True
         return await self._execute(model, method, [ids], kwargs)
 
     async def check_order_exists(self, platform: str, platform_order_id: str) -> int | None:

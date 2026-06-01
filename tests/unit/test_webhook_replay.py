@@ -1,4 +1,4 @@
-"""Replay-nonce fail-open behavior."""
+"""Replay-nonce behavior + Redis-down DB fallback (P1 review fix)."""
 
 from __future__ import annotations
 
@@ -14,35 +14,45 @@ from src.api.routers.webhooks import _is_replay, _mark_processed
 async def test_first_seen_not_replay() -> None:
     fake = AsyncMock()
     fake.exists = AsyncMock(return_value=0)  # key not present
+    db = AsyncMock()
     with patch("src.api.routers.webhooks.get_redis", return_value=fake):
-        assert await _is_replay("sig_abcdef") is False
+        assert await _is_replay("sig_abcdef", db) is False
+    db.scalar.assert_not_called()  # Redis up → no DB fallback
 
 
 @pytest.mark.asyncio
 async def test_duplicate_is_replay() -> None:
     fake = AsyncMock()
     fake.exists = AsyncMock(return_value=1)  # key already present
+    db = AsyncMock()
     with patch("src.api.routers.webhooks.get_redis", return_value=fake):
-        assert await _is_replay("sig_abcdef") is True
+        assert await _is_replay("sig_abcdef", db) is True
 
 
 @pytest.mark.asyncio
-async def test_redis_down_fails_open(caplog) -> None:
+async def test_redis_down_db_fallback_detects_replay() -> None:
+    """Redis down: an already-ingested signature in webhook_event_log is
+    still caught as a replay (no fail-open hole)."""
     fake = AsyncMock()
     fake.exists = AsyncMock(side_effect=RedisConnectionError("connection refused"))
+    db = AsyncMock()
+    db.scalar = AsyncMock(return_value=123)  # prior signature_valid row exists
     with patch("src.api.routers.webhooks.get_redis", return_value=fake):
-        # Must NOT raise — fail-open → not_replay
-        assert await _is_replay("sig_abcdef") is False
+        assert await _is_replay("sig_abcdef", db) is True
+    db.scalar.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_redis_timeout_fails_open() -> None:
-    from redis.exceptions import TimeoutError as RedisTimeoutError
-
+async def test_redis_down_db_fallback_new_event_processes() -> None:
+    """Redis down: a never-seen signature has no DB row → not a replay, so
+    the event still processes (no silent loss)."""
     fake = AsyncMock()
-    fake.exists = AsyncMock(side_effect=RedisTimeoutError("timeout"))
+    fake.exists = AsyncMock(side_effect=RedisConnectionError("down"))
+    db = AsyncMock()
+    db.scalar = AsyncMock(return_value=None)  # no prior row
     with patch("src.api.routers.webhooks.get_redis", return_value=fake):
-        assert await _is_replay("sig_abcdef") is False
+        assert await _is_replay("sig_abcdef", db) is False
+    db.scalar.assert_awaited_once()
 
 
 @pytest.mark.asyncio

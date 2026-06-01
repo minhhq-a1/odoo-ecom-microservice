@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     SHOPEE_PARTNER_KEY: str
     SHOPEE_SHOP_ID: str
     SHOPEE_IS_SANDBOX: bool = False
+    # Exact registered push/callback URL. Used verbatim as the prefix of the
+    # webhook HMAC base string (push_url + raw_body) — must match what is
+    # configured in the Shopee partner console, NOT a proxy-rewritten URL.
+    SHOPEE_WEBHOOK_URL: str = ""
 
     SLACK_WEBHOOK_URL: str | None = None
     ALERT_EMAIL: str | None = None

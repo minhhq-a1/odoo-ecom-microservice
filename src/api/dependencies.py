@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 from typing import TYPE_CHECKING
 
 from fastapi import Cookie, Form, Header, HTTPException, Query, status
@@ -29,7 +30,7 @@ def require_admin_token(
     # Prefer the explicit query token: it lets an admin recover from a
     # stale/wrong cookie without manually clearing browser state.
     candidate = token or admin_token
-    if candidate != settings.ADMIN_SECRET_TOKEN:
+    if not hmac.compare_digest(candidate or "", settings.ADMIN_SECRET_TOKEN):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Unauthorized",
